@@ -10,3 +10,4 @@ data/uploads/
 data/previews/
 .env
 data/samples/
+build/
