@@ -8,7 +8,7 @@ slots:
     required: true
     infer_from: [file_trimbox]        # 파일 재단크기(TrimBox)에서 추론
     ask_if_conflict: true             # 추론값과 고객 발화가 다르면 확인
-    choices: ["50x50", "70x70", "100x100"]
+    choices: ["50x50", "70x70", "90x90", "100x100"]
     unit: mm
     synonyms:
       "정사각 오공": "50x50"

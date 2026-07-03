@@ -110,6 +110,24 @@ class CheckContext:
             cache[key] = page.render(scale=scale).to_pil()
         return cache[key]
 
+    def content_events(self, page_index: int) -> list:
+        """contentstream.walk_page 결과 (캐시). 이미지 배치·잉크량·선폭·텍스트색 검사용."""
+        cache = getattr(self, "_events_cache", None)
+        if cache is None:
+            cache = {}
+            self._events_cache = cache
+        if page_index not in cache:
+            from core.preflight.contentstream import walk_page
+
+            cache[page_index] = walk_page(self.pdf, page_index)
+        return cache[page_index]
+
+    def resources(self, page_index: int):
+        """페이지 /Resources 딕셔너리 (없으면 빈 딕셔너리)."""
+        import pikepdf
+
+        return self.pdf.pages[page_index].get("/Resources", pikepdf.Dictionary())
+
     def close(self) -> None:
         if "pdf" in self.__dict__:
             self.__dict__["pdf"].close()

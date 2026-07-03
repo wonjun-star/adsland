@@ -8,7 +8,7 @@ slots:
     required: true
     infer_from: [file_trimbox]
     ask_if_conflict: true
-    choices: ["30x30", "40x40", "60x40"]
+    choices: ["30x30", "40x40", "60x40", "60x60"]
     unit: mm
     synonyms:
       "동전만한": "30x30"
