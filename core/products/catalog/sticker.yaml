@@ -1,0 +1,79 @@
+# 스티커 슬롯 스키마 — core/products/schema.py::ProductSchema 형식 (docs/PLAN.md §7)
+# size.choices 는 core/quote/pricebook.yaml 의 sticker 사이즈 키와 1:1 로 일치해야 한다.
+product: sticker
+display_name: 스티커
+slots:
+  size:
+    display_name: 사이즈
+    required: true
+    infer_from: [file_trimbox]        # 파일 재단크기(TrimBox)에서 추론
+    ask_if_conflict: true             # 추론값과 고객 발화가 다르면 확인
+    choices: ["50x50", "70x70", "100x100"]
+    unit: mm
+    synonyms:
+      "정사각 오공": "50x50"
+      "손톱만한": "50x50"
+      "칠공": "70x70"
+      "컵받침만한": "100x100"
+  quantity:
+    display_name: 수량
+    required: true
+    infer_from: []
+    quick_options: [100, 500, 1000]
+    unit: 매
+  material:
+    display_name: 용지
+    required: true
+    default: art_250
+    risk_if_defaulted: low            # 기본값 통보 후 진행
+    choices: [art_250, art_300, art_300_matte, pvc_white]
+    synonyms:
+      "도톰한": art_300
+      "두꺼운": art_300
+      "빳빳한": art_300
+      "고급": art_300_matte
+      "고급스러운": art_300_matte
+      "무광 느낌": art_300_matte
+      "차분한": art_300_matte
+      "방수": pvc_white
+      "방수 되는": pvc_white
+      "물에 안 젖는": pvc_white
+      "야외용": pvc_white
+      "텀블러에 붙일": pvc_white
+      "일반": art_250
+      "아트지": art_250
+  coating:
+    display_name: 코팅
+    required: false
+    default: matte
+    risk_if_defaulted: low
+    choices: ["none", matte, gloss]
+    synonyms:
+      "무광": matte
+      "매트": matte
+      "유광": gloss
+      "반짝이는": gloss
+      "반짝반짝": gloss
+      "광택": gloss
+      "코팅 없이": "none"
+      "코팅 빼고": "none"
+  cut_type:
+    display_name: 재단 형태
+    required: true
+    infer_from: [dieline_present]     # 칼선 별색(CutContour 등) 있으면 도무송(자유형) 추정
+    risk_if_defaulted: high           # 틀리면 실물 파손 → 반드시 고객 확정
+    choices: [square, circle, die_cut]
+    synonyms:
+      "도무송": die_cut
+      "자유형": die_cut
+      "칼선 따라": die_cut
+      "모양대로": die_cut
+      "따내기": die_cut
+      "원형": circle
+      "동그란": circle
+      "동그라미": circle
+      "사각": square
+      "네모": square
+      "네모나게": square
+gates:
+  production: [preflight_all_pass, customer_confirmed, no_escalation]
