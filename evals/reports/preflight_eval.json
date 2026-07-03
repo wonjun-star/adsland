@@ -217,7 +217,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.01
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/clean_06_flyer_v2.pdf",
@@ -237,7 +237,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/clean_07_poster_v1.pdf",
@@ -317,7 +317,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/single_01_namecard_bleed.pdf",
@@ -339,7 +339,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/single_02_flyer_bleed.pdf",
@@ -427,7 +427,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.01
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/single_06_namecard_colorspace.pdf",
@@ -449,7 +449,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.01
     },
     {
       "file": "data/samples/corpus/single_07_poster_colorspace.pdf",
@@ -603,7 +603,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/single_14_namecard_black_type.pdf",
@@ -625,7 +625,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.01
     },
     {
       "file": "data/samples/corpus/single_15_flyer_black_type.pdf",
@@ -713,7 +713,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.01
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/single_19_flyer_page_count.pdf",
@@ -735,7 +735,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/single_20_sticker_dieline.pdf",
@@ -801,7 +801,7 @@
         "transparency": "warn",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/single_23_label_transparency.pdf",
@@ -823,7 +823,7 @@
         "transparency": "warn",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/single_24_namecard_min_line.pdf",
@@ -913,7 +913,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/multi_03_flyer_resolution-colorspace.pdf",
@@ -936,7 +936,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.01
     },
     {
       "file": "data/samples/corpus/multi_04_poster_ink_total-black_type.pdf",
@@ -1005,7 +1005,7 @@
         "transparency": "pass",
         "trim_safety": "uncertain"
       },
-      "elapsed_sec": 0.01
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/multi_07_flyer_transparency-min_line.pdf",
@@ -1051,7 +1051,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/multi_09_poster_bleed-resolution.pdf",
@@ -1097,7 +1097,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/multi_11_namecard_black_type-min_line-trim_safety.pdf",
@@ -1121,7 +1121,7 @@
         "transparency": "pass",
         "trim_safety": "uncertain"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/multi_12_flyer_bleed-ink_total-transparency.pdf",

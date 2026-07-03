@@ -1,0 +1,18 @@
+# A유형 — "일반 명함" 같은 고객 언어(synonyms)로 사이즈를 지정: 질문 0개로 완주
+id: a2_namecard_alias_size
+description: 명함, "일반 명함"(=90x50)·"단면" 등 고객 표현만으로 사양이 채워지는 A유형.
+steps:
+  - user: "일반 명함으로 단면 200매 부탁드려요."
+  - upload: "data/samples/corpus/clean_03_namecard_v1.pdf"
+  - user: "네 진행해주세요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 3
+  slots:
+    size: "90x50"
+    quantity: 200
+    sides: single
+    material: snow_250
+    coating: "none"
+  escalated: false

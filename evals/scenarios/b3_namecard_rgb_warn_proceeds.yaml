@@ -1,0 +1,19 @@
+# B유형 — RGB 색공간 결함(warn) 파일: 경고 고지 후에도 관문은 통과, 완주 가능
+# colorspace는 warn(변환 가능, 색변화 고지)이라 fail/uncertain과 달리 생산 관문을 막지 않는다.
+id: b3_namecard_rgb_warn_proceeds
+description: 명함, RGB 색공간이 섞인 파일을 올린 B유형. 경고 고지 후 그대로 진행해 완주.
+steps:
+  - user: "명함 200장 단면, 스노우지로 부탁드려요. 파일 색상은 좀 봐주세요."
+  - upload: "data/samples/corpus/single_06_namecard_colorspace.pdf"
+  - user: "네 진행해주세요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 2
+  slots:
+    size: "90x50"
+    quantity: 200
+    sides: single
+    material: snow_250
+    coating: "none"
+  escalated: false

@@ -388,6 +388,11 @@ class IntakeService:
                     dl = report.by_id("dieline")
                     if dl and (dl.measured or {}).get("dieline_present"):
                         inferred[name] = "die_cut"
+                elif source == "file_page_count":
+                    pc = report.by_id("page_count")
+                    file_pages = (pc.measured or {}).get("file_pages") if pc else None
+                    if file_pages in (1, 2):
+                        inferred[name] = "single" if file_pages == 1 else "double"
         return inferred
 
     def _quote(self, row: OrderSession) -> QuoteResult | None:
@@ -419,10 +424,11 @@ class IntakeService:
         schema = self.catalog[row.product]
         inferred = self._inferred(row, report)
 
-        # 추론값 영속화 (빈 슬롯만 — 사용자 값을 덮지 않는다)
+        # 추론값 영속화 — 사용자 값은 덮지 않지만, 기본값은 파일 증거가 이긴다
         for name, value in inferred.items():
-            current = (row.slots or {}).get(name, {}).get("value")
-            if current is None:
+            entry = (row.slots or {}).get(name, {})
+            current, src = entry.get("value"), entry.get("source")
+            if current is None or (src == "default" and current != value):
                 self.store.set_slot(session_id, name, value, source="inferred")
         row = self._get(session_id)
 

@@ -1,0 +1,20 @@
+# B유형 — 저해상도(fail, autofix 불가) 파일 → 정상 파일 재업로드로 회복 → 완주
+# resolution fail은 자동 보정이 없으므로 관문이 막히고, 고객이 더 좋은 원본을 다시 올려 해소한다.
+id: b4_flyer_lowres_reupload
+description: 전단, 해상도 미달 파일이 반려된 뒤 고해상도 파일을 다시 올려 완주하는 B유형.
+steps:
+  - user: "전단지 A5 2000장 단면이요."
+  - upload: "data/samples/corpus/single_05_flyer_resolution.pdf"
+  - upload: "data/samples/corpus/clean_05_flyer_v1.pdf"
+  - user: "네 확정할게요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 2
+  slots:
+    size: A5
+    quantity: 2000
+    sides: single
+    material: art_100
+    coating: "none"
+  escalated: false

@@ -1,0 +1,16 @@
+# 엣지 — 견적 30만원 초과: quote_over_threshold 시그널 → 에스컬레이션 (PLAN §8)
+# 포스터 A1 300매 = 공급가 285,000 + VAT = 313,500원 > 300,000원 임계.
+id: e4_high_quote_escalates
+description: 포스터 A1 300장 고액 주문. 견적이 임계(30만원)를 넘어 담당자 확인으로 넘어간다.
+steps:
+  - user: "포스터 A1으로 300장 주문하려고요."
+expect:
+  completed: false
+  final_state: SLOT_FILLING
+  max_questions: 2
+  slots:
+    size: A1
+    quantity: 300
+    material: art_150
+  escalated: true
+  escalation_contains: "quote_over_threshold"

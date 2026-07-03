@@ -1,0 +1,17 @@
+# B유형 — 재단선 안전여백 침범(uncertain) 파일: 의도 판별 불가 → 담당자 검토 에스컬레이션
+# uncertain은 해소 전까지 관문 차단 + 즉시 에스컬레이션 시그널 (PLAN §6·§8 회색지대의 본체).
+id: b5_sticker_trim_safety_escalates
+description: 스티커, 글자가 재단선 안전선 안쪽까지 들어온 파일. 자동 판정 불가로 에스컬레이션.
+steps:
+  - user: "스티커 90x90 500장 도무송인데 파일 좀 수정 필요할 수도 있어요."
+  - upload: "data/samples/corpus/single_11_sticker_trim_safety.pdf"
+expect:
+  completed: false
+  final_state: SLOT_FILLING
+  max_questions: 2
+  slots:
+    size: "90x90"
+    quantity: 500
+    cut_type: die_cut
+  escalated: true
+  escalation_contains: "preflight_uncertain:trim_safety"

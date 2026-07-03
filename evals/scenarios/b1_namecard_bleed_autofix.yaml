@@ -1,0 +1,19 @@
+# B유형 — bleed 결함 파일 + autofix 버튼 흐름: 자동 보정 후 재검판 통과 → 완주
+id: b1_namecard_bleed_autofix
+description: 명함, 재단여백(bleed) 부족 파일을 올린 B유형. autofix로 여백 연장 후 확정까지.
+steps:
+  - user: "명함 여백이 부족하다고 반려됐어요. 수정해서 다시 진행하고 싶어요. 400장 단면으로요."
+  - upload: "data/samples/corpus/single_01_namecard_bleed.pdf"
+  - action: "autofix:bleed"
+  - action: confirm
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 2
+  slots:
+    size: "90x50"
+    quantity: 400
+    sides: single
+    material: snow_250
+    coating: "none"
+  escalated: false

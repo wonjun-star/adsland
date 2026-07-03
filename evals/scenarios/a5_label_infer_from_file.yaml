@@ -1,0 +1,20 @@
+# A유형 — 발화는 수량뿐, 사이즈·재단형태는 파일에서 추론: 질문 2개(≤3)로 완주
+# 첫 턴에 size·cut_type 질문이 나오지만, 파일 업로드로 둘 다 추론(TrimBox·칼선 별색)되어
+# 재질문 없이 확정 단계로 간다 — "파일이 답이면 묻지 않는다" 정책의 대표 케이스.
+id: a5_label_infer_from_file
+description: 라벨 3천 장. 사이즈와 재단 형태를 파일(TrimBox·칼선)에서 추론해 질문을 줄이는 A유형.
+steps:
+  - user: "라벨 3천 장 주문하고 싶어요."
+  - upload: "data/samples/corpus/clean_09_label_v1.pdf"
+  - user: "네 이대로 진행해주세요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 3
+  slots:
+    size: "60x60"
+    quantity: 3000
+    cut_type: die_cut
+    material: art_paper
+    coating: "none"
+  escalated: false

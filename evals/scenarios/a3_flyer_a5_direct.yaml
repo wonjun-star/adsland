@@ -1,0 +1,18 @@
+# A유형 — 전단 규격명(A5) 직접 지정: 질문 0개로 완주
+id: a3_flyer_a5_direct
+description: 전단, A5·1000장·단면을 한 번에 말하고 정상 파일을 올리는 A유형.
+steps:
+  - user: "전단지 A5로 1000장 단면 인쇄 부탁드려요."
+  - upload: "data/samples/corpus/clean_05_flyer_v1.pdf"
+  - user: "좋아요 확정할게요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 3
+  slots:
+    size: A5
+    quantity: 1000
+    sides: single
+    material: art_100
+    coating: "none"
+  escalated: false

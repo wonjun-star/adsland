@@ -1,0 +1,17 @@
+# A유형 — 포스터 + 확정 버튼 경로(action: confirm): 질문 0개로 완주
+id: a4_poster_confirm_button
+description: 포스터 A2 50매. 자연어 확정 대신 확정 버튼(action)으로 완주하는 A유형.
+steps:
+  - user: "포스터 A2 사이즈로 50매 필요해요."
+  - upload: "data/samples/corpus/clean_07_poster_v1.pdf"
+  - action: confirm
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 3
+  slots:
+    size: A2
+    quantity: 50
+    material: art_150
+    coating: "none"
+  escalated: false

@@ -65,7 +65,8 @@ slots:
   sides:
     display_name: 인쇄면
     required: true
-    default: double
+    infer_from: [file_page_count]     # 파일 1p → 단면, 2p → 양면 추정
+    default: single
     risk_if_defaulted: low
     choices: [single, double]
     synonyms:

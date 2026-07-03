@@ -1,0 +1,18 @@
+# A유형 — 완성 파일 + 첫 발화에 사양 전부: 질문 0개로 완주
+id: a1_sticker_full_spec
+description: 스티커, 첫 발화에 사이즈·수량·재단형태를 전부 말한 A유형 고객. 질문 없이 확정까지.
+steps:
+  - user: "스티커 문의드려요. 90x90으로 500매, 도무송 부탁해요."
+  - upload: "data/samples/corpus/clean_01_sticker_v1.pdf"
+  - user: "네 이대로 진행해주세요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 3
+  slots:
+    size: "90x90"
+    quantity: 500
+    cut_type: die_cut
+    material: art_250
+    coating: matte
+  escalated: false

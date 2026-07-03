@@ -1,0 +1,20 @@
+# 엣지 — 잘못된 사이즈 발화(75x75, 선택지에 없음): 거부 + 질문으로 회복 → 완주
+# 스키마에 없는 값은 확정되지 않고(치명 지표 방어) 안내 후 재질문으로 이어진다.
+id: e5_invalid_size_recovers
+description: 스티커를 없는 규격(75x75)으로 주문한 고객. 옵션 안내 질문으로 회복해 완주.
+steps:
+  - user: "스티커 75x75로 500장 도무송 부탁해요."
+  - user: "아 그럼 90x90으로 해주세요."
+  - upload: "data/samples/corpus/clean_02_sticker_v2.pdf"
+  - user: "네 진행해주세요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 2
+  slots:
+    size: "90x90"
+    quantity: 500
+    cut_type: die_cut
+    material: art_250
+    coating: matte
+  escalated: false

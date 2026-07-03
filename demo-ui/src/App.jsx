@@ -1,122 +1,195 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+// 접수 데스크 루트 — 세션 시작/턴 처리/카드 전달.
+// 상태의 유일한 원천은 서버 응답의 session 스냅샷이다 (docs/API.md 원칙).
 
-function App() {
-  const [count, setCount] = useState(0)
+import { useCallback, useEffect, useRef, useState } from 'react'
+import './App.css'
+import { api, ApiError } from './api'
+import AccessGate from './components/AccessGate'
+import BoardPanel from './components/BoardPanel'
+import ChatPane from './components/ChatPane'
+import SidePanel from './components/SidePanel'
+
+let nextMessageId = 1
+
+export default function App() {
+  const [locked, setLocked] = useState(null) // null = 접속 확인 중
+  const [session, setSession] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [compare, setCompare] = useState(false)
+  const initialized = useRef(false)
+
+  const push = useCallback((msg) => {
+    setMessages((prev) => [...prev, { id: nextMessageId++, ...msg }])
+  }, [])
+
+  const pushReply = useCallback(
+    (data) => {
+      setSession(data.session)
+      push({
+        role: 'assistant',
+        text: data.reply?.text || '',
+        quickOptions: data.reply?.quick_options || [],
+        cards: data.cards || [],
+      })
+    },
+    [push],
+  )
+
+  /** 새 상담 시작 (POST /api/session). 401이면 접속 코드 게이트로. */
+  const startSession = useCallback(async () => {
+    setBusy(true)
+    setMessages([])
+    setSession(null)
+    try {
+      const data = await api('/api/session', { method: 'POST' })
+      setLocked(false)
+      pushReply(data)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        setLocked(true)
+        return
+      }
+      setLocked(false)
+      push({
+        role: 'system',
+        text: '서버에 연결하지 못했어요. 서버가 켜져 있는지 확인한 뒤 상단의 "새 상담"으로 다시 시도해 주세요.',
+      })
+    } finally {
+      setBusy(false)
+    }
+  }, [push, pushReply])
+
+  useEffect(() => {
+    if (initialized.current) return // StrictMode 이중 마운트에서 세션 중복 생성 방지
+    initialized.current = true
+    startSession()
+  }, [startSession])
+
+  /** 서버 턴 공통 처리: 요청 → session 교체 → 어시스턴트 말풍선 추가. */
+  const runTurn = useCallback(
+    async (request) => {
+      setBusy(true)
+      try {
+        const data = await request()
+        pushReply(data)
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          setLocked(true)
+          return
+        }
+        push({ role: 'system', text: e.message || '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.' })
+      } finally {
+        setBusy(false)
+      }
+    },
+    [push, pushReply],
+  )
+
+  const sendMessage = useCallback(
+    (text) => {
+      const t = String(text).trim()
+      if (!t || !session || busy) return
+      push({ role: 'user', text: t })
+      runTurn(() => api(`/api/session/${session.id}/message`, { method: 'POST', body: { text: t } }))
+    },
+    [session, busy, push, runTurn],
+  )
+
+  const uploadFile = useCallback(
+    (file) => {
+      if (!session || busy || !file) return
+      const name = file.name || 'upload.pdf'
+      if (file.type !== 'application/pdf' && !/\.pdf$/i.test(name)) {
+        push({ role: 'system', text: 'PDF 파일만 접수할 수 있어요. 인쇄용 PDF로 저장한 뒤 다시 올려 주세요.' })
+        return
+      }
+      push({ role: 'user', text: name, isFile: true })
+      const formData = new FormData()
+      formData.append('file', file)
+      runTurn(() => api(`/api/session/${session.id}/upload`, { method: 'POST', formData }))
+    },
+    [session, busy, push, runTurn],
+  )
+
+  const applyAutofix = useCallback(
+    (checkId) => {
+      if (!session || busy) return
+      push({ role: 'user', text: '자동 보정을 적용해 주세요.' })
+      runTurn(() => api(`/api/session/${session.id}/autofix`, { method: 'POST', body: { check_id: checkId } }))
+    },
+    [session, busy, push, runTurn],
+  )
+
+  const confirmOrder = useCallback(() => {
+    if (!session || busy) return
+    push({ role: 'user', text: '네, 이대로 확정할게요.' })
+    runTurn(() => api(`/api/session/${session.id}/confirm`, { method: 'POST' }))
+  }, [session, busy, push, runTurn])
+
+  const rejectConfirm = useCallback(() => {
+    sendMessage('확정 전에 사양을 조금 바꾸고 싶어요.')
+  }, [sendMessage])
+
+  if (locked === null) {
+    return <div className="boot">접속 확인 중…</div>
+  }
+  if (locked) {
+    return <AccessGate onUnlocked={startSession} />
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32">
+              <rect width="32" height="32" rx="7" fill="currentColor" />
+              <path d="M10 6.5h8.5L23 11v14.5H10z" fill="#fff" />
+              <path d="M13 15.5h7M13 18.5h7M13 21.5h4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </span>
+          <div className="brand-text">
+            <h1>AI 파일접수·검판 데스크</h1>
+            <span>프로토타입 · 파일 접수부터 견적 확정까지</span>
+          </div>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+        <div className="topbar-actions">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={compare}
+              onChange={(e) => setCompare(e.target.checked)}
+            />
+            <span className="knob" aria-hidden="true" />
+            비교 데모
+          </label>
+          <button type="button" className="btn ghost" onClick={startSession} disabled={busy}>
+            새 상담
+          </button>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      </header>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      {compare && (
+        <div className="compare-banner">
+          같은 주문, 두 방식 — 기존 게시판 왕복 <strong>반나절</strong> vs AI 접수 <strong>30초</strong>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      <div className={compare ? 'workspace compare' : 'workspace'}>
+        {compare && <BoardPanel />}
+        <ChatPane
+          messages={messages}
+          busy={busy}
+          session={session}
+          onSend={sendMessage}
+          onUpload={uploadFile}
+          onAutofix={applyAutofix}
+          onConfirm={confirmOrder}
+          onReject={rejectConfirm}
+        />
+        <SidePanel session={session} />
+      </div>
+    </div>
   )
 }
-
-export default App

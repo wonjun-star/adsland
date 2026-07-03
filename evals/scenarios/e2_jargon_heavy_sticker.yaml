@@ -1,0 +1,19 @@
+# 엣지 — 인쇄 은어 범벅 발화: "도무송/천 장/방수 되는/유광"이 전부 스펙으로 정규화되는지
+# 같은 슬롯(material)에 뒤에 나온 표현이 승자, 긴 synonyms 키 우선 — 봉인된 파싱 규칙 검증.
+id: e2_jargon_heavy_sticker
+description: 스티커, 인쇄 은어만으로 주문하는 고객. synonyms 데이터가 은어를 스펙으로 변환한다.
+steps:
+  - user: "스티커 도무송으로 천 장 부탁해요. 방수 되는 걸로 하고 유광 코팅이요."
+  - upload: "data/samples/corpus/clean_02_sticker_v2.pdf"
+  - user: "네 이대로 진행해주세요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 2
+  slots:
+    size: "90x90"
+    quantity: 1000
+    cut_type: die_cut
+    material: pvc_white
+    coating: gloss
+  escalated: false

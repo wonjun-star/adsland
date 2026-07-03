@@ -1,0 +1,236 @@
+{
+  "summary": {
+    "run_at": "2026-07-03T14:44:26.552642+00:00",
+    "mode": "rule",
+    "total": 15,
+    "passed": 15,
+    "a_type_avg_questions": 0.4,
+    "critical_count": 0,
+    "targets": {
+      "passed_min": 13,
+      "a_type_avg_questions_max": 3.0,
+      "critical_max": 0
+    },
+    "goal_met": true
+  },
+  "scenarios": [
+    {
+      "id": "a1_sticker_full_spec",
+      "type": "A",
+      "description": "스티커, 첫 발화에 사이즈·수량·재단형태를 전부 말한 A유형 고객. 질문 없이 확정까지.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 0,
+      "max_questions": 3,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "a2_namecard_alias_size",
+      "type": "A",
+      "description": "명함, \"일반 명함\"(=90x50)·\"단면\" 등 고객 표현만으로 사양이 채워지는 A유형.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 0,
+      "max_questions": 3,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "a3_flyer_a5_direct",
+      "type": "A",
+      "description": "전단, A5·1000장·단면을 한 번에 말하고 정상 파일을 올리는 A유형.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 0,
+      "max_questions": 3,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "a4_poster_confirm_button",
+      "type": "A",
+      "description": "포스터 A2 50매. 자연어 확정 대신 확정 버튼(action)으로 완주하는 A유형.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 0,
+      "max_questions": 3,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "a5_label_infer_from_file",
+      "type": "A",
+      "description": "라벨 3천 장. 사이즈와 재단 형태를 파일(TrimBox·칼선)에서 추론해 질문을 줄이는 A유형.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 2,
+      "max_questions": 3,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "b1_namecard_bleed_autofix",
+      "type": "B",
+      "description": "명함, 재단여백(bleed) 부족 파일을 올린 B유형. autofix로 여백 연장 후 확정까지.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 1,
+      "max_questions": 2,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "b2_flyer_bleed_autofix",
+      "type": "B",
+      "description": "전단, 재단여백(bleed) 부족 파일을 올린 B유형. autofix 적용 후 자연어로 확정.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 0,
+      "max_questions": 2,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "b3_namecard_rgb_warn_proceeds",
+      "type": "B",
+      "description": "명함, RGB 색공간이 섞인 파일을 올린 B유형. 경고 고지 후 그대로 진행해 완주.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 1,
+      "max_questions": 2,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "b4_flyer_lowres_reupload",
+      "type": "B",
+      "description": "전단, 해상도 미달 파일이 반려된 뒤 고해상도 파일을 다시 올려 완주하는 B유형.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 0,
+      "max_questions": 2,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "b5_sticker_trim_safety_escalates",
+      "type": "B",
+      "description": "스티커, 글자가 재단선 안전선 안쪽까지 들어온 파일. 자동 판정 불가로 에스컬레이션.",
+      "passed": true,
+      "final_state": "SLOT_FILLING",
+      "expected_state": "SLOT_FILLING",
+      "questions": 0,
+      "max_questions": 2,
+      "escalated": true,
+      "escalation_reasons": [
+        "preflight_uncertain:trim_safety"
+      ],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "e1_design_request_escalates",
+      "type": "EDGE",
+      "description": "시안을 새로 만들어 달라는 C유형 고객. 시안 생성은 비목표(§1.3)라 사람에게 넘긴다.",
+      "passed": true,
+      "final_state": "SLOT_FILLING",
+      "expected_state": "SLOT_FILLING",
+      "questions": 2,
+      "max_questions": 3,
+      "escalated": true,
+      "escalation_reasons": [
+        "customer_type_C_design_needed"
+      ],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "e2_jargon_heavy_sticker",
+      "type": "EDGE",
+      "description": "스티커, 인쇄 은어만으로 주문하는 고객. synonyms 데이터가 은어를 스펙으로 변환한다.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 1,
+      "max_questions": 2,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "e3_slot_thrashing_escalates",
+      "type": "EDGE",
+      "description": "수량을 500→1000→300으로 두 번 번복하는 고객. 슬롯 흔들림 시그널로 사람에게 넘긴다.",
+      "passed": true,
+      "final_state": "SLOT_FILLING",
+      "expected_state": "SLOT_FILLING",
+      "questions": 0,
+      "max_questions": 2,
+      "escalated": true,
+      "escalation_reasons": [
+        "slot_thrashing:quantity"
+      ],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "e4_high_quote_escalates",
+      "type": "EDGE",
+      "description": "포스터 A1 300장 고액 주문. 견적이 임계(30만원)를 넘어 담당자 확인으로 넘어간다.",
+      "passed": true,
+      "final_state": "SLOT_FILLING",
+      "expected_state": "SLOT_FILLING",
+      "questions": 0,
+      "max_questions": 2,
+      "escalated": true,
+      "escalation_reasons": [
+        "quote_over_threshold"
+      ],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "e5_invalid_size_recovers",
+      "type": "EDGE",
+      "description": "스티커를 없는 규격(75x75)으로 주문한 고객. 옵션 안내 질문으로 회복해 완주.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 1,
+      "max_questions": 2,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    }
+  ]
+}

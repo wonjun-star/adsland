@@ -1,0 +1,19 @@
+# B유형 — bleed 결함 파일 + autofix 후 자연어 확정: 자동 보정 흐름 2종째(전단)
+id: b2_flyer_bleed_autofix
+description: 전단, 재단여백(bleed) 부족 파일을 올린 B유형. autofix 적용 후 자연어로 확정.
+steps:
+  - user: "전단 A5 2000장 단면으로 하려는데 재단 여백 좀 고쳐주세요."
+  - upload: "data/samples/corpus/single_02_flyer_bleed.pdf"
+  - action: "autofix:bleed"
+  - user: "네 이대로 진행해주세요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 2
+  slots:
+    size: A5
+    quantity: 2000
+    sides: single
+    material: art_100
+    coating: "none"
+  escalated: false

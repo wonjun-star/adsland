@@ -1,0 +1,17 @@
+# 엣지 — 같은 슬롯(수량) 2회 번복: 왕복 간 값 변경 2회 이상 → 즉시 에스컬레이션 (PLAN §8)
+id: e3_slot_thrashing_escalates
+description: 수량을 500→1000→300으로 두 번 번복하는 고객. 슬롯 흔들림 시그널로 사람에게 넘긴다.
+steps:
+  - user: "스티커 90x90 500장 도무송으로요."
+  - user: "천 장으로 바꿔주세요."
+  - user: "아니다, 300장으로 다시 바꿔주세요."
+expect:
+  completed: false
+  final_state: SLOT_FILLING
+  max_questions: 2
+  slots:
+    size: "90x90"
+    quantity: 300
+    cut_type: die_cut
+  escalated: true
+  escalation_contains: "slot_thrashing:quantity"
