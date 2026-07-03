@@ -1,0 +1,1221 @@
+{
+  "manifest": "data\\samples\\manifest.json",
+  "n_files": 50,
+  "n_checks": 12,
+  "n_cells": 600,
+  "totals": {
+    "tp": 58,
+    "fn": 0,
+    "fp": 0,
+    "tn": 542
+  },
+  "recall": 1.0,
+  "false_positive_rate": 0.0,
+  "targets": {
+    "recall": 0.95,
+    "fpr": 0.1
+  },
+  "targets_met": true,
+  "missing_checks": [],
+  "run_errors": [],
+  "per_check": {
+    "black_type": {
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "tn": 45,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "bleed": {
+      "tp": 7,
+      "fn": 0,
+      "fp": 0,
+      "tn": 43,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "colorspace": {
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "tn": 45,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "dieline": {
+      "tp": 4,
+      "fn": 0,
+      "fp": 0,
+      "tn": 46,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "font_embed": {
+      "tp": 4,
+      "fn": 0,
+      "fp": 0,
+      "tn": 46,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "ink_total": {
+      "tp": 4,
+      "fn": 0,
+      "fp": 0,
+      "tn": 46,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "min_line": {
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "tn": 45,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "page_count": {
+      "tp": 4,
+      "fn": 0,
+      "fp": 0,
+      "tn": 46,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "page_size": {
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "tn": 45,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "resolution": {
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "tn": 45,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "transparency": {
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "tn": 45,
+      "recall": 1.0,
+      "fpr": 0.0
+    },
+    "trim_safety": {
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "tn": 45,
+      "recall": 1.0,
+      "fpr": 0.0
+    }
+  },
+  "misses": [],
+  "false_positives": [],
+  "files": [
+    {
+      "file": "data/samples/corpus/clean_01_sticker_v1.pdf",
+      "product": "sticker",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.09
+    },
+    {
+      "file": "data/samples/corpus/clean_02_sticker_v2.pdf",
+      "product": "sticker",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/clean_03_namecard_v1.pdf",
+      "product": "namecard",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/clean_04_namecard_v2.pdf",
+      "product": "namecard",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/clean_05_flyer_v1.pdf",
+      "product": "flyer",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.01
+    },
+    {
+      "file": "data/samples/corpus/clean_06_flyer_v2.pdf",
+      "product": "flyer",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/clean_07_poster_v1.pdf",
+      "product": "poster",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/clean_08_poster_v2.pdf",
+      "product": "poster",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/clean_09_label_v1.pdf",
+      "product": "label",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/clean_10_label_v2.pdf",
+      "product": "label",
+      "injected": [],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.02
+    },
+    {
+      "file": "data/samples/corpus/single_01_namecard_bleed.pdf",
+      "product": "namecard",
+      "injected": [
+        "bleed"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "fail",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_02_flyer_bleed.pdf",
+      "product": "flyer",
+      "injected": [
+        "bleed"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "fail",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_03_sticker_bleed.pdf",
+      "product": "sticker",
+      "injected": [
+        "bleed"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "fail",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_04_poster_resolution.pdf",
+      "product": "poster",
+      "injected": [
+        "resolution"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "fail",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_05_flyer_resolution.pdf",
+      "product": "flyer",
+      "injected": [
+        "resolution"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "fail",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.01
+    },
+    {
+      "file": "data/samples/corpus/single_06_namecard_colorspace.pdf",
+      "product": "namecard",
+      "injected": [
+        "colorspace"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "warn",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_07_poster_colorspace.pdf",
+      "product": "poster",
+      "injected": [
+        "colorspace"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "warn",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_08_flyer_font_embed.pdf",
+      "product": "flyer",
+      "injected": [
+        "font_embed"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "fail",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_09_label_font_embed.pdf",
+      "product": "label",
+      "injected": [
+        "font_embed"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "fail",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.02
+    },
+    {
+      "file": "data/samples/corpus/single_10_namecard_trim_safety.pdf",
+      "product": "namecard",
+      "injected": [
+        "trim_safety"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "uncertain"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_11_sticker_trim_safety.pdf",
+      "product": "sticker",
+      "injected": [
+        "trim_safety"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "uncertain"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_12_poster_ink_total.pdf",
+      "product": "poster",
+      "injected": [
+        "ink_total"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "warn",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_13_flyer_ink_total.pdf",
+      "product": "flyer",
+      "injected": [
+        "ink_total"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "warn",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.02
+    },
+    {
+      "file": "data/samples/corpus/single_14_namecard_black_type.pdf",
+      "product": "namecard",
+      "injected": [
+        "black_type"
+      ],
+      "statuses": {
+        "black_type": "warn",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_15_flyer_black_type.pdf",
+      "product": "flyer",
+      "injected": [
+        "black_type"
+      ],
+      "statuses": {
+        "black_type": "warn",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_16_sticker_page_size.pdf",
+      "product": "sticker",
+      "injected": [
+        "page_size"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "fail",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_17_poster_page_size.pdf",
+      "product": "poster",
+      "injected": [
+        "page_size"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "fail",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_18_namecard_page_count.pdf",
+      "product": "namecard",
+      "injected": [
+        "page_count"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "fail",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.01
+    },
+    {
+      "file": "data/samples/corpus/single_19_flyer_page_count.pdf",
+      "product": "flyer",
+      "injected": [
+        "page_count"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "fail",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_20_sticker_dieline.pdf",
+      "product": "sticker",
+      "injected": [
+        "dieline"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "uncertain",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_21_label_dieline.pdf",
+      "product": "label",
+      "injected": [
+        "dieline"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "uncertain",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_22_poster_transparency.pdf",
+      "product": "poster",
+      "injected": [
+        "transparency"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "warn",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.02
+    },
+    {
+      "file": "data/samples/corpus/single_23_label_transparency.pdf",
+      "product": "label",
+      "injected": [
+        "transparency"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "warn",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_24_namecard_min_line.pdf",
+      "product": "namecard",
+      "injected": [
+        "min_line"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "warn",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/single_25_sticker_min_line.pdf",
+      "product": "sticker",
+      "injected": [
+        "min_line"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "warn",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_01_sticker_bleed-trim_safety.pdf",
+      "product": "sticker",
+      "injected": [
+        "bleed",
+        "trim_safety"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "fail",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "uncertain"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_02_namecard_page_size-page_count.pdf",
+      "product": "namecard",
+      "injected": [
+        "page_count",
+        "page_size"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "fail",
+        "page_size": "fail",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.02
+    },
+    {
+      "file": "data/samples/corpus/multi_03_flyer_resolution-colorspace.pdf",
+      "product": "flyer",
+      "injected": [
+        "colorspace",
+        "resolution"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "warn",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "fail",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_04_poster_ink_total-black_type.pdf",
+      "product": "poster",
+      "injected": [
+        "black_type",
+        "ink_total"
+      ],
+      "statuses": {
+        "black_type": "warn",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "warn",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_05_label_dieline-bleed.pdf",
+      "product": "label",
+      "injected": [
+        "bleed",
+        "dieline"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "fail",
+        "colorspace": "pass",
+        "dieline": "uncertain",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_06_namecard_font_embed-trim_safety.pdf",
+      "product": "namecard",
+      "injected": [
+        "font_embed",
+        "trim_safety"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "fail",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "uncertain"
+      },
+      "elapsed_sec": 0.01
+    },
+    {
+      "file": "data/samples/corpus/multi_07_flyer_transparency-min_line.pdf",
+      "product": "flyer",
+      "injected": [
+        "min_line",
+        "transparency"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "warn",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "warn",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_08_sticker_dieline-page_size.pdf",
+      "product": "sticker",
+      "injected": [
+        "dieline",
+        "page_size"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "uncertain",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "fail",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_09_poster_bleed-resolution.pdf",
+      "product": "poster",
+      "injected": [
+        "bleed",
+        "resolution"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "fail",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "fail",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_10_label_colorspace-font_embed.pdf",
+      "product": "label",
+      "injected": [
+        "colorspace",
+        "font_embed"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "warn",
+        "dieline": "pass",
+        "font_embed": "fail",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_11_namecard_black_type-min_line-trim_safety.pdf",
+      "product": "namecard",
+      "injected": [
+        "black_type",
+        "min_line",
+        "trim_safety"
+      ],
+      "statuses": {
+        "black_type": "warn",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "warn",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "uncertain"
+      },
+      "elapsed_sec": 0.02
+    },
+    {
+      "file": "data/samples/corpus/multi_12_flyer_bleed-ink_total-transparency.pdf",
+      "product": "flyer",
+      "injected": [
+        "bleed",
+        "ink_total",
+        "transparency"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "fail",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "warn",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "warn",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_13_poster_page_size-colorspace.pdf",
+      "product": "poster",
+      "injected": [
+        "colorspace",
+        "page_size"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "warn",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "pass",
+        "page_size": "fail",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_14_sticker_resolution-transparency-min_line.pdf",
+      "product": "sticker",
+      "injected": [
+        "min_line",
+        "resolution",
+        "transparency"
+      ],
+      "statuses": {
+        "black_type": "pass",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "warn",
+        "page_count": "pass",
+        "page_size": "pass",
+        "resolution": "fail",
+        "transparency": "warn",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "file": "data/samples/corpus/multi_15_label_page_count-black_type.pdf",
+      "product": "label",
+      "injected": [
+        "black_type",
+        "page_count"
+      ],
+      "statuses": {
+        "black_type": "warn",
+        "bleed": "pass",
+        "colorspace": "pass",
+        "dieline": "pass",
+        "font_embed": "pass",
+        "ink_total": "pass",
+        "min_line": "pass",
+        "page_count": "fail",
+        "page_size": "pass",
+        "resolution": "pass",
+        "transparency": "pass",
+        "trim_safety": "pass"
+      },
+      "elapsed_sec": 0.01
+    }
+  ]
+}
