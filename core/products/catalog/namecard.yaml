@@ -1,0 +1,80 @@
+# 명함 슬롯 스키마 — core/products/schema.py::ProductSchema 형식 (docs/PLAN.md §7)
+# size.choices 는 core/quote/pricebook.yaml 의 namecard 사이즈 키와 1:1 로 일치해야 한다.
+product: namecard
+display_name: 명함
+slots:
+  size:
+    display_name: 사이즈
+    required: true
+    infer_from: [file_trimbox]
+    ask_if_conflict: true
+    choices: ["90x50", "86x54"]
+    unit: mm
+    synonyms:
+      "일반 명함": "90x50"
+      "표준": "90x50"
+      "보통 명함": "90x50"
+      "카드형": "86x54"
+      "카드 사이즈": "86x54"
+      "신용카드만한": "86x54"
+  quantity:
+    display_name: 수량
+    required: true
+    infer_from: []
+    quick_options: [200, 400, 1000]
+    unit: 매
+    synonyms:
+      "한 통": 200
+      "두 통": 400
+      "다섯 통": 1000
+  material:
+    display_name: 용지
+    required: true
+    default: snow_250
+    risk_if_defaulted: low
+    choices: [snow_250, art_230, vannouveau_210]
+    synonyms:
+      "스노우지": snow_250
+      "기본": snow_250
+      "일반": snow_250
+      "무난한": snow_250
+      "아트지": art_230
+      "반짝이는": art_230
+      "코팅 느낌": art_230
+      "반누보": vannouveau_210
+      "고급": vannouveau_210
+      "고급스러운": vannouveau_210
+      "종이 질감": vannouveau_210
+      "까끌까끌한": vannouveau_210
+      "수입지": vannouveau_210
+  coating:
+    display_name: 코팅
+    required: false
+    default: "none"
+    risk_if_defaulted: low
+    choices: ["none", matte, gloss]
+    synonyms:
+      "무광": matte
+      "무광 코팅": matte
+      "매트": matte
+      "유광": gloss
+      "광택": gloss
+      "반짝이는 코팅": gloss
+      "코팅 없이": "none"
+      "코팅 안 해요": "none"
+  sides:
+    display_name: 인쇄면
+    required: true
+    default: double
+    risk_if_defaulted: low
+    choices: [single, double]
+    synonyms:
+      "단면": single
+      "한 면만": single
+      "앞면만": single
+      "양면": double
+      "앞뒤": double
+      "앞뒤로": double
+      "뒷면까지": double
+gates:
+  production: [preflight_all_pass, customer_confirmed, no_escalation]

@@ -1,0 +1,60 @@
+# 포스터 슬롯 스키마 — core/products/schema.py::ProductSchema 형식 (docs/PLAN.md §7)
+# size.choices 는 core/quote/pricebook.yaml 의 poster 사이즈 키와 1:1 로 일치해야 한다.
+product: poster
+display_name: 포스터
+slots:
+  size:
+    display_name: 사이즈
+    required: true
+    infer_from: [file_trimbox]
+    ask_if_conflict: true
+    choices: [A3, A2, A1]
+    unit: mm
+    synonyms:
+      "에이쓰리": A3
+      "제일 작은": A3
+      "에이투": A2
+      "중간 크기": A2
+      "에이원": A1
+      "제일 큰": A1
+      "대형": A1
+  quantity:
+    display_name: 수량
+    required: true
+    infer_from: []
+    quick_options: [10, 50, 100]
+    unit: 매
+  material:
+    display_name: 용지
+    required: true
+    default: art_150
+    risk_if_defaulted: low
+    choices: [art_150, art_200, snow_200]
+    synonyms:
+      "일반": art_150
+      "아트지": art_150
+      "기본": art_150
+      "도톰한": art_200
+      "두꺼운": art_200
+      "빳빳한": art_200
+      "고급": art_200
+      "스노우지": snow_200
+      "무광 느낌": snow_200
+      "안 반짝이는": snow_200
+      "차분한": snow_200
+  coating:
+    display_name: 코팅
+    required: false
+    default: "none"
+    risk_if_defaulted: low
+    choices: ["none", matte, gloss]
+    synonyms:
+      "무광": matte
+      "매트": matte
+      "유광": gloss
+      "광택": gloss
+      "반짝이는": gloss
+      "코팅 없이": "none"
+      "코팅 빼고": "none"
+gates:
+  production: [preflight_all_pass, customer_confirmed, no_escalation]

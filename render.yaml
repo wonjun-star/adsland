@@ -1,0 +1,16 @@
+# Render 무료 배포 설정 — 저장소 연결 시 자동 인식 (Blueprint)
+# 무료 플랜: 15분 무접속 시 슬립 → 첫 접속 시 ~50초 기동.
+# UptimeRobot 등으로 /api/health 를 5분 간격 핑하면 사실상 상시 가동.
+services:
+  - type: web
+    name: print-intake
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # 대시보드에서 직접 입력 (커밋 금지)
+      - key: ACCESS_CODE
+        sync: false          # 애즈랜드에 전달할 접속 코드
+      - key: PRINT_INTAKE_DB
+        value: sqlite:////tmp/sessions.db   # 무료 플랜은 디스크 휘발 — 프로토타입 허용

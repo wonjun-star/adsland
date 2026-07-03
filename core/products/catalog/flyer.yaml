@@ -1,0 +1,71 @@
+# 전단 슬롯 스키마 — core/products/schema.py::ProductSchema 형식 (docs/PLAN.md §7)
+# size.choices 는 core/quote/pricebook.yaml 의 flyer 사이즈 키와 1:1 로 일치해야 한다.
+product: flyer
+display_name: 전단
+slots:
+  size:
+    display_name: 사이즈
+    required: true
+    infer_from: [file_trimbox]
+    ask_if_conflict: true
+    choices: [A4, A5, B5]
+    unit: mm
+    synonyms:
+      "에이포": A4
+      "복사용지 크기": A4
+      "에이오": A5
+      "에이포 반": A5
+      "절반 크기": A5
+      "비오": B5
+  quantity:
+    display_name: 수량
+    required: true
+    infer_from: []
+    quick_options: [1000, 2000, 4000]
+    unit: 매
+  material:
+    display_name: 용지
+    required: true
+    default: art_100
+    risk_if_defaulted: low
+    choices: [art_100, art_150, snow_120]
+    synonyms:
+      "일반": art_100
+      "얇은": art_100
+      "가장 싼": art_100
+      "아트지": art_100
+      "도톰한": art_150
+      "두꺼운": art_150
+      "빳빳한": art_150
+      "고급": art_150
+      "스노우지": snow_120
+      "무광 느낌": snow_120
+      "차분한": snow_120
+      "안 반짝이는": snow_120
+  coating:
+    display_name: 코팅
+    required: false
+    default: "none"
+    risk_if_defaulted: low
+    choices: ["none", matte]        # 전단은 무광 라미네이팅만 취급 (pricebook addons 와 일치)
+    synonyms:
+      "무광": matte
+      "무광 코팅": matte
+      "매트": matte
+      "코팅 없이": "none"
+      "코팅 빼고": "none"
+  sides:
+    display_name: 인쇄면
+    required: true
+    default: double
+    risk_if_defaulted: low
+    choices: [single, double]
+    synonyms:
+      "단면": single
+      "한 면만": single
+      "앞면만": single
+      "양면": double
+      "앞뒤": double
+      "앞뒤로": double
+gates:
+  production: [preflight_all_pass, customer_confirmed, no_escalation]

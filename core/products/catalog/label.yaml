@@ -1,0 +1,77 @@
+# 라벨(소형 도무송/롤 라벨) 슬롯 스키마 — core/products/schema.py::ProductSchema 형식 (docs/PLAN.md §7)
+# size.choices 는 core/quote/pricebook.yaml 의 label 사이즈 키와 1:1 로 일치해야 한다.
+product: label
+display_name: 라벨
+slots:
+  size:
+    display_name: 사이즈
+    required: true
+    infer_from: [file_trimbox]
+    ask_if_conflict: true
+    choices: ["30x30", "40x40", "60x40"]
+    unit: mm
+    synonyms:
+      "동전만한": "30x30"
+      "병뚜껑만한": "30x30"
+      "사공": "40x40"
+      "제품 뒷면용": "60x40"
+  quantity:
+    display_name: 수량
+    required: true
+    infer_from: []
+    quick_options: [1000, 5000, 10000]
+    unit: 매
+  material:
+    display_name: 용지
+    required: true
+    default: art_paper
+    risk_if_defaulted: low
+    choices: [art_paper, yupo, clear_pet]
+    synonyms:
+      "일반": art_paper
+      "아트지": art_paper
+      "종이 라벨": art_paper
+      "유포지": yupo
+      "방수": yupo
+      "방수 되는": yupo
+      "물에 안 젖는": yupo
+      "냉장 보관용": yupo
+      "안 찢어지는": yupo
+      "투명": clear_pet
+      "투명한": clear_pet
+      "비치는": clear_pet
+      "데드롱": clear_pet
+      "병에 붙이는 투명": clear_pet
+  coating:
+    display_name: 코팅
+    required: false
+    default: "none"
+    risk_if_defaulted: low
+    choices: ["none", matte, gloss]
+    synonyms:
+      "무광": matte
+      "매트": matte
+      "유광": gloss
+      "광택": gloss
+      "반짝이는": gloss
+      "코팅 없이": "none"
+      "코팅 빼고": "none"
+  cut_type:
+    display_name: 재단 형태
+    required: true
+    infer_from: [dieline_present]     # 칼선 별색 있으면 도무송(자유형) 추정
+    risk_if_defaulted: high           # 틀리면 실물 파손 → 반드시 고객 확정
+    choices: [square, circle, die_cut]
+    synonyms:
+      "도무송": die_cut
+      "자유형": die_cut
+      "칼선 따라": die_cut
+      "모양대로": die_cut
+      "반칼": die_cut
+      "원형": circle
+      "동그란": circle
+      "동그라미": circle
+      "사각": square
+      "네모": square
+gates:
+  production: [preflight_all_pass, customer_confirmed, no_escalation]
