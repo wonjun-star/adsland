@@ -17,6 +17,8 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from core.autofix.extend_bleed import extend_bleed
+from core.design.card import generate_namecard
+from core.design.schema import DEFAULT_TEMPLATE, DESIGNABLE_PRODUCTS, TEMPLATES, CardContent
 from core.llm.parsing import ClassifyProposal, CustomerType, Intent, SlotProposal
 from core.orchestrator import policy
 from core.orchestrator.policy import AutoFill, Conflict, SlotQuestion
@@ -83,12 +85,15 @@ class SessionView(BaseModel):
     escalated: bool = False
     confirmed: bool = False
     turn_count: int = 0
+    file_path: str | None = None
+    design_mode: bool = False
+    card_template: str | None = None
 
 
 class ReplyDirectives(BaseModel):
     """LLM(또는 템플릿 폴백)이 자연어 응답을 만들 재료. 숫자·판정은 전부 확정값."""
 
-    kind: str = "turn"  # greeting | turn | upload | autofix | confirm
+    kind: str = "turn"  # greeting | turn | upload | autofix | confirm | design
     questions: list[SlotQuestion] = Field(default_factory=list)
     auto_filled: list[AutoFill] = Field(default_factory=list)
     conflicts: list[Conflict] = Field(default_factory=list)
@@ -102,6 +107,11 @@ class ReplyDirectives(BaseModel):
     escalation_reasons: list[str] = Field(default_factory=list)
     order_no: str | None = None
     awaiting_confirm: bool = False
+    # 시안 생성 경로
+    design_generated: bool = False           # 이번 턴에 시안을 새로 만들었는가
+    design_template_name: str = ""           # 적용된 템플릿 표시명
+    request_card_fields: bool = False        # 이름/회사 등 명함 내용이 더 필요
+    offer_design: bool = False               # 파일 없는 명함 고객에게 시안 생성 제안
 
 
 class TurnResult(BaseModel):
@@ -247,6 +257,105 @@ class IntakeService:
             )
         return result
 
+    def handle_card_content(
+        self,
+        session_id: str,
+        content: CardContent,
+        template: str | None = None,
+    ) -> TurnResult:
+        """명함 시안 경로: 내용 필드를 누적하고, 충분하면 인쇄용 시안을 생성한다.
+
+        생성물은 업로드 파일과 동일한 프리플라이트·견적·확정 파이프라인을 탄다
+        (생성이든 업로드든 같은 검판을 거친다는 신뢰가 데모의 핵심).
+        """
+        self.store.increment_turn(session_id)
+        row = self._get(session_id)
+
+        # 상품 확정: 시안 생성은 명함만 (DESIGNABLE_PRODUCTS)
+        if row.product not in DESIGNABLE_PRODUCTS:
+            if row.product is None:
+                self.store.set_product(session_id, "namecard")
+            else:
+                return self._advance(session_id, notices=[f"design_unsupported:{row.product}"])
+
+        # 상태 전진: INTAKE→CLASSIFY→SLOT_FILLING
+        row = self._get(session_id)
+        if State(row.state) == State.INTAKE:
+            self.store.transition(session_id, State.CLASSIFY, "design_first_input")
+        row = self._get(session_id)
+        if State(row.state) == State.CLASSIFY:
+            self.store.transition(session_id, State.SLOT_FILLING, "design_product_namecard")
+
+        # 내용 누적 (턴마다 부분 입력을 합친다)
+        existing = CardContent(**(row.card_content or {}))
+        merged = existing.merged_with(content)
+        tmpl = template or row.card_template or DEFAULT_TEMPLATE
+        if tmpl not in TEMPLATES:
+            tmpl = DEFAULT_TEMPLATE
+        self.store.set_design(session_id, merged.model_dump(), tmpl)
+
+        # 이름·회사 중 하나도 없으면 아직 못 만든다 → 내용 요청
+        if not merged.is_generatable():
+            result = self._advance(session_id, kind="design")
+            result.directives.request_card_fields = True
+            return result
+
+        # 생성 → 세션 파일로 등록 → 검판
+        self._generate_design(session_id, merged, tmpl)
+        result = self._advance(session_id, kind="design", report=self._latest_report(session_id))
+        result.directives.design_generated = True
+        result.directives.design_template_name = TEMPLATES[tmpl]
+        row = self._get(session_id)
+        result.cards.insert(0, self._design_card(row))
+        return result
+
+    def _generate_design(self, session_id: str, content: CardContent, template: str) -> dict:
+        """명함 PDF 생성 → 파일 등록 → FILE_CHECK 왕복으로 검판."""
+        out_dir = UPLOAD_DIR / session_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out = out_dir / "design_namecard.pdf"
+        info = generate_namecard(content, out, template=template)
+        self.store.set_file_path(session_id, str(out))
+        self.store.record_event(session_id, "design_generated", info)
+
+        row = self._get(session_id)
+        if State(row.state) in (State.SLOT_FILLING, State.PROOF_CONFIRM):
+            self.store.transition(session_id, State.FILE_CHECK, "design_recheck")
+            self._run_preflight(session_id)
+            self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
+        else:
+            self._run_preflight(session_id)
+        return info
+
+    def _design_card(self, row: OrderSession) -> dict:
+        """design_preview 카드 (API가 preview 로컬경로 → URL 변환)."""
+        preview = self._render_preview_png(Path(row.file_path), row.id) if row.file_path else None
+        return {
+            "type": "design_preview",
+            "template": row.card_template,
+            "templates": [{"id": tid, "name": name} for tid, name in TEMPLATES.items()],
+            "preview": preview,
+            "fields": {k: v for k, v in (row.card_content or {}).items() if v},
+        }
+
+    def _render_preview_png(self, pdf_path: Path, session_id: str, scale: float = 2.5) -> str | None:
+        """PDF 1페이지 → 미리보기 PNG (pdfium). previews 디렉터리에 저장."""
+        try:
+            import pypdfium2 as pdfium
+
+            out_dir = PREVIEW_DIR / session_id
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out = out_dir / f"{pdf_path.stem}_preview.png"
+            doc = pdfium.PdfDocument(str(pdf_path))
+            try:
+                img = doc[0].render(scale=scale).to_pil()
+            finally:
+                doc.close()
+            img.save(out)
+            return str(out)
+        except Exception:
+            return None
+
     def confirm(self, session_id: str) -> TurnResult:
         """고객 확정 → 3중 관문 → 통과 시 결제 목업 → 주문 완료."""
         row = self._get(session_id)
@@ -313,6 +422,9 @@ class IntakeService:
             escalated=row.escalated,
             confirmed=row.customer_confirmed,
             turn_count=row.turn_count,
+            file_path=row.file_path,
+            design_mode=bool(row.design_mode),
+            card_template=row.card_template,
         )
 
     def _validate_slot_value(self, schema: ProductSchema, name: str, value: Any) -> tuple[bool, Any]:
@@ -502,7 +614,11 @@ class IntakeService:
                 row = self.store.transition(session_id, State.PROOF_CONFIRM, "all_slots_and_checks_ok")
                 d.awaiting_confirm = True
             elif not row.file_path:
-                d.request_file = True
+                # 명함은 파일이 없으면 시안 생성을 제안한다 (파일 없는 초보 고객 유입)
+                if row.product in DESIGNABLE_PRODUCTS and not row.design_mode:
+                    d.offer_design = True
+                else:
+                    d.request_file = True
         elif state == State.PROOF_CONFIRM:
             if ready:
                 d.awaiting_confirm = True

@@ -28,6 +28,7 @@ FastAPI(`api/main.py`)와 React UI(`demo-ui/`)는 이 문서를 기준으로 맞
 - `{"type": "quote", "total": 24000, "currency": "KRW", "lines": […], "vat_included": true}`
 - `{"type": "autofix_preview", "check_id": "bleed", "before_url": "/api/files/…png", "after_url": "…"}`
 - `{"type": "file_preview", "url": "/api/files/…png"}` — 업로드 파일 1페이지 미리보기
+- `{"type": "design_preview", "template": "modern", "templates": [{"id","name"}…], "preview_url": "/api/files/…png", "fields": {…}}` — 생성한 명함 시안 미리보기 + 템플릿 목록
 - `{"type": "escalation", "reasons": […]}` — "사람 검판 큐로 이동했습니다"
 - `{"type": "order_confirmed", "order_no": "…", "summary": {…}}` — 결제 목업 완료
 
@@ -41,6 +42,7 @@ FastAPI(`api/main.py`)와 React UI(`demo-ui/`)는 이 문서를 기준으로 맞
 | `POST /api/session/{id}/message` | `{text}` | 공통 응답 |
 | `POST /api/session/{id}/upload` | multipart `file` (PDF) | 공통 응답 (preflight_report·file_preview 카드) |
 | `POST /api/session/{id}/autofix` | `{check_id}` | 공통 응답 (autofix_preview + 재검판 리포트) |
+| `POST /api/session/{id}/design` | `{template?, fields?}` | 명함 시안 생성/재생성 (템플릿 변경·내용 수정). 공통 응답 (design_preview) |
 | `POST /api/session/{id}/confirm` | – | 공통 응답 (관문 통과 시 order_confirmed, 실패 시 blockers 설명) |
 | `GET /api/files/{name}` | – | PNG/PDF 파일 |
 | `GET /api/demo/board` | – | 왼쪽 패널용 합성 게시판 스레드 (타임스탬프 연출 포함) |

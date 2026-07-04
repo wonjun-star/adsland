@@ -1,9 +1,9 @@
 {
   "summary": {
-    "run_at": "2026-07-03T14:44:26.552642+00:00",
+    "run_at": "2026-07-04T12:46:41.222695+00:00",
     "mode": "rule",
-    "total": 15,
-    "passed": 15,
+    "total": 16,
+    "passed": 16,
     "a_type_avg_questions": 0.4,
     "critical_count": 0,
     "targets": {
@@ -159,7 +159,7 @@
     {
       "id": "e1_design_request_escalates",
       "type": "EDGE",
-      "description": "시안을 새로 만들어 달라는 C유형 고객. 시안 생성은 비목표(§1.3)라 사람에게 넘긴다.",
+      "description": "포스터 시안을 새로 만들어 달라는 C유형. 포스터 자동 시안은 비목표라 사람에게 넘긴다.",
       "passed": true,
       "final_state": "SLOT_FILLING",
       "expected_state": "SLOT_FILLING",
@@ -222,6 +222,20 @@
       "id": "e5_invalid_size_recovers",
       "type": "EDGE",
       "description": "스티커를 없는 규격(75x75)으로 주문한 고객. 옵션 안내 질문으로 회복해 완주.",
+      "passed": true,
+      "final_state": "COMPLETED",
+      "expected_state": "COMPLETED",
+      "questions": 1,
+      "max_questions": 2,
+      "escalated": false,
+      "escalation_reasons": [],
+      "failures": [],
+      "criticals": []
+    },
+    {
+      "id": "e6_namecard_design_generates",
+      "type": "EDGE",
+      "description": "디자인 없는 명함 고객이 정보만 입력 → 시안 자동 생성 → 검판 통과 → 확정.",
       "passed": true,
       "final_state": "COMPLETED",
       "expected_state": "COMPLETED",

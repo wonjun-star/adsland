@@ -62,6 +62,11 @@ class AutofixBody(BaseModel):
     check_id: str
 
 
+class DesignBody(BaseModel):
+    template: str | None = None
+    fields: dict | None = None
+
+
 # ---------------------------------------------------------------- 접속 제어
 
 
@@ -113,6 +118,11 @@ def _publish_cards(cards: list[dict]) -> list[dict]:
                     }
                 )
             continue  # URL 변환 불가한 미리보기는 카드 자체를 내보내지 않는다
+        if card.get("type") == "design_preview":
+            published = {k: v for k, v in card.items() if k != "preview"}
+            published["preview_url"] = _to_file_url(card.get("preview"))
+            out.append(published)
+            continue
         out.append(card)
     return out
 
@@ -264,6 +274,14 @@ def create_app() -> FastAPI:
     @app.post("/api/session/{session_id}/autofix")
     def post_autofix(session_id: str, body: AutofixBody):
         result, reply = run_or_404(pipeline.process_autofix, session_id, body.check_id)
+        return _turn_response(result, reply)
+
+    @app.post("/api/session/{session_id}/design")
+    def post_design(session_id: str, body: DesignBody):
+        """명함 시안 생성/재생성 (템플릿 변경·내용 수정)."""
+        result, reply = run_or_404(
+            pipeline.process_design, session_id, body.template, body.fields
+        )
         return _turn_response(result, reply)
 
     @app.post("/api/session/{session_id}/confirm")

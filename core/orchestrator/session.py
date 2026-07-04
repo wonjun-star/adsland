@@ -79,6 +79,10 @@ class OrderSession(Base):
     customer_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     llm_parse_failures: Mapped[int] = mapped_column(Integer, default=0)
     turn_count: Mapped[int] = mapped_column(Integer, default=0)
+    # 시안 생성(명함) 경로 — 파일 없는 고객이 정보만으로 인쇄용 시안을 받는 흐름
+    design_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    card_content: Mapped[dict] = mapped_column(JSON, default=dict)   # CardContent 필드
+    card_template: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
 class Event(Base):
@@ -115,8 +119,27 @@ class SessionStore:
                 db_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine = create_engine(url, **kwargs)
         Base.metadata.create_all(self.engine)
+        self._ensure_columns()  # 기존 파일 DB에 새 컬럼(시안 경로)을 더한다
         # expire_on_commit=False: 반환된 객체를 세션 종료 후에도 읽을 수 있게
         self._session_factory = sessionmaker(self.engine, expire_on_commit=False)
+
+    def _ensure_columns(self) -> None:
+        """create_all은 테이블만 만들고 컬럼 추가는 못 한다. 스키마가 늘었을 때
+        기존 SQLite 파일에 누락 컬럼을 ADD COLUMN으로 채운다 (프로토타입용 경량 마이그레이션).
+        """
+        from sqlalchemy import inspect, text
+
+        added = {
+            "design_mode": "BOOLEAN DEFAULT 0",
+            "card_content": "JSON",
+            "card_template": "VARCHAR(32)",
+        }
+        insp = inspect(self.engine)
+        existing = {c["name"] for c in insp.get_columns("order_sessions")}
+        with self.engine.begin() as conn:
+            for name, ddl in added.items():
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE order_sessions ADD COLUMN {name} {ddl}"))
 
     # ------------------------------------------------------------------ 내부
 
@@ -309,5 +332,23 @@ class SessionStore:
             row = self._get_or_raise(db, session_id)
             row.file_path = file_path
             self._append_event(db, row.id, "file_attached", {"file_path": file_path})
+            db.commit()
+            return row
+
+    def set_design(
+        self, session_id: str, card_content: dict, template: str, mode: bool = True
+    ) -> OrderSession:
+        """시안 경로 상태 기록: 명함 콘텐츠 필드 + 선택 템플릿."""
+        with self._db() as db:
+            row = self._get_or_raise(db, session_id)
+            row.design_mode = mode
+            row.card_content = dict(card_content or {})
+            row.card_template = template
+            self._append_event(
+                db,
+                row.id,
+                "design_updated",
+                {"template": template, "fields": sorted(k for k, v in card_content.items() if v)},
+            )
             db.commit()
             return row

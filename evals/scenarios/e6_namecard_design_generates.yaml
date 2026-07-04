@@ -1,0 +1,18 @@
+# 엣지 — 파일 없는 초보 고객(명함): 정보만으로 인쇄용 시안을 자동 생성해 주문까지.
+# 프로토타입의 핵심 확장 — "디자인이 없어도" 접수가 끊기지 않고 견적·확정으로 이어진다.
+id: e6_namecard_design_generates
+description: 디자인 없는 명함 고객이 정보만 입력 → 시안 자동 생성 → 검판 통과 → 확정.
+steps:
+  - user: "명함 만들고 싶어요. 회사이름: 피플즈리그 주식회사, 이름: 황원준, 직위: 수석 연구원, 번호: 01046574801"
+  - user: "400장이요"
+  - user: "네 이대로 진행할게요"
+expect:
+  completed: true
+  final_state: COMPLETED
+  max_questions: 2
+  slots:
+    size: "90x50"
+    quantity: 400
+    sides: single
+    material: snow_250
+  escalated: false

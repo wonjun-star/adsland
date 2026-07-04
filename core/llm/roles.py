@@ -21,6 +21,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from core.design.schema import CardContent
 from core.llm.adapter import LLMAdapter
 from core.llm.parsing import (
     ClassifyProposal,
@@ -28,6 +29,7 @@ from core.llm.parsing import (
     Intent,
     ParseError,
     SlotProposal,
+    extract_json,
     validate_proposal,
 )
 from core.products.schema import ProductSchema, SlotDef
@@ -307,6 +309,125 @@ def _rule_parse(text: str, schema: ProductSchema | None, awaiting_confirm: bool)
     return SlotProposal(
         intent=intent, slots=slots, negative_sentiment=negative, confidence_signals=signals
     )
+
+
+# ================================================================ 2.5) 명함 내용 파서 (시안 생성 경로)
+
+#: 라벨 → CardContent 필드. "회사이름: 피플즈리그" 같은 표기 입력을 흡수한다.
+_CARD_LABEL_PATTERNS: list[tuple[str, str]] = [
+    ("company", r"회사\s*(?:이름|명)?|상호|법인명|소속"),
+    ("name", r"(?:사람\s*)?이름|성함"),
+    ("tel", r"유선|대표\s*번호|사무실\s*(?:전화|번호)|팩스"),
+    ("phone", r"(?:휴대폰|핸드폰|휴대전화)\s*(?:번호)?|(?:전화|연락처|폰|번호)"),
+    ("title", r"직위|직책|직함"),
+    ("department", r"부서|팀\s*명?"),
+    ("email", r"이\s?메일|메일|e-?mail"),
+    ("address", r"주소"),
+    ("tagline", r"슬로건|문구"),
+]
+
+_PHONE_MOBILE_RE = re.compile(r"01[016789][\s\-.]?\d{3,4}[\s\-.]?\d{4}")
+_PHONE_TEL_RE = re.compile(r"0\d{1,2}[\s\-.]?\d{3,4}[\s\-.]?\d{4}")
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+_COMPANY_RE = re.compile(r"(?:[\w가-힣&.\- ]{1,20}\s*(?:주식회사|\(주\)|㈜))|(?:(?:주식회사|\(주\)|㈜)\s*[\w가-힣&.\-]{1,20})")
+#: 값 뒤에 붙는 지시·잡문 절단 ("수석 연구원 이렇게 넣어서 만들어줘" → "수석 연구원")
+_VALUE_STOP_RE = re.compile(
+    r"\s*(?:이렇게|이대로|요렇게|위\s*내용|넣어서?|들어가게|들어간|으로\s*(?:만들|해|부탁)|로\s*(?:만들|해|부탁)|만들|제작|부탁|해\s?주|해\s?줘|주세요|할게|입니다|이에요|예요|이고|이며).*$"
+)
+
+#: 템플릿 선택 표현 → 템플릿 id
+_TEMPLATE_WORDS: dict[str, str] = {
+    "모던": "modern",
+    "컬러 바": "modern",
+    "클래식": "classic",
+    "가운데": "classic",
+    "미니멀": "minimal",
+    "심플": "minimal",
+    "깔끔한 걸": "minimal",
+}
+
+
+def extract_template(text: str) -> str | None:
+    """발화에서 템플릿 선택 표현 추출 (시안 흐름에서만 호출할 것 — 일반 대화 오탐 방지)."""
+    for word, tmpl in _TEMPLATE_WORDS.items():
+        if word in text:
+            return tmpl
+    return None
+
+
+def parse_card_content(text: str, adapter: LLMAdapter | None) -> CardContent:
+    """발화 → 명함에 인쇄할 내용 추출. 없는 필드는 빈 문자열 (merge는 오케스트레이터가)."""
+    if adapter is not None:
+        system = _load_prompt("card_content_v1.md")
+        raw = adapter.complete(
+            system, [{"role": "user", "content": text}], role="parse", max_tokens=500
+        )
+        try:
+            return CardContent.model_validate(extract_json(raw))
+        except Exception as e:  # pydantic 오류 포함 전부 ParseError로 수렴
+            raise ParseError(f"명함 내용 추출 실패: {e}") from e
+    return _rule_card_content(text)
+
+
+def _clean_value(raw: str) -> str:
+    value = raw.strip().strip(" :：,;·~-\t\r\n")
+    value = _VALUE_STOP_RE.sub("", value).strip(" ,.\r\n\t")
+    return value[:40].strip()
+
+
+#: 약한 구분(맨 공백)으로 잡힌 값의 첫 토큰이 조사로 끝나면 라벨 오탐으로 본다
+_JOSA_HEAD_RE = re.compile(r"^\S{1,4}(?:을|를|은|는|도|의|에)\s")
+
+
+def _rule_card_content(text: str) -> CardContent:
+    """라벨 우선 + 패턴 보조. 라벨 값은 다음 라벨 직전까지로 자른다."""
+    # 1) 라벨 위치 수집 — sep이 콜론/조사면 강한 매칭, 맨 공백이면 약한 매칭
+    spans: list[tuple[int, int, str, bool]] = []  # (label_start, value_start, field, strong)
+    for field, label_pat in _CARD_LABEL_PATTERNS:
+        # 라벨 앞이 글자면 라벨이 아니다 ("주식회사"의 '회사', "회사이름"의 '이름' 오탐 차단)
+        for m in re.finditer(rf"(?<![\w가-힣])(?:{label_pat})\s*(?P<sep>[:：]\s*|(?:은|는)\s+|\s+)", text):
+            sep = m.group("sep")
+            strong = (":" in sep) or ("：" in sep) or (sep.strip() in ("은", "는"))
+            spans.append((m.start(), m.end(), field, strong))
+    # 같은 시작점은 라벨이 긴 쪽 우선, 이후 겹치는 라벨("회사이름" 속 "이름")은 제거
+    spans.sort(key=lambda s: (s[0], -s[1]))
+    filtered: list[tuple[int, int, str, bool]] = []
+    for span in spans:
+        if filtered and span[0] < filtered[-1][1]:
+            continue  # 직전 라벨 영역 안에서 시작 → 부분 라벨 오탐
+        filtered.append(span)
+
+    data: dict[str, str] = {}
+    for i, (start, vstart, field, strong) in enumerate(filtered):
+        vend = filtered[i + 1][0] if i + 1 < len(filtered) else len(text)
+        value = _clean_value(text[vstart:vend])
+        if not value or field in data:
+            continue
+        if not strong and _JOSA_HEAD_RE.match(value + " "):
+            continue  # "회사 이름을 크게..." 같은 일반 문장 오탐 차단
+        data[field] = value
+
+    # 2) 형식이 확실한 값은 전체 텍스트에서 재추출 (라벨 오분류 교정)
+    m = _EMAIL_RE.search(text)
+    if m:
+        data["email"] = m.group(0)
+    m = _PHONE_MOBILE_RE.search(text)
+    if m:
+        data["phone"] = m.group(0)
+    else:
+        m = _PHONE_TEL_RE.search(data.get("phone", "") or text)
+        if m and "phone" in data:
+            data["tel"] = m.group(0)
+            data.pop("phone", None)
+    # 휴대폰 라벨 값이 유선번호였던 경우 등: 번호 형식이 아니면 버린다
+    if "phone" in data and not (_PHONE_MOBILE_RE.search(data["phone"]) or _PHONE_TEL_RE.search(data["phone"])):
+        data.pop("phone")
+    if "company" not in data:
+        m = _COMPANY_RE.search(text)
+        if m:
+            data["company"] = _clean_value(m.group(0))
+
+    return CardContent(**data)
 
 
 # ================================================================ 3) 대화 생성기
@@ -741,6 +862,21 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
         return line
     if code.startswith("unknown_product:"):
         return "말씀하신 상품은 아직 준비 중이에요. 지금은 스티커, 명함, 전단, 포스터, 라벨을 도와드릴 수 있어요."
+    if code.startswith("quote_missing:"):
+        axis, _, value = code.split(":", 1)[1].partition("=")
+        display = _slot_display(axis, schema)
+        sdef = schema.slots.get(axis) if schema else None
+        opts = None
+        if sdef and sdef.quick_options:
+            opts = "/".join(f"{_fmt_num(o)}{sdef.unit}" for o in sdef.quick_options)
+        elif sdef and sdef.choices:
+            opts = ", ".join(_label(c) for c in sdef.choices)
+        line = f"말씀하신 {display} '{value}'{_eun(value)} 지금 가격표에 없어요."
+        if opts:
+            line += f" {opts} 중에서 골라주시면 바로 견적을 내드릴게요."
+        return line
+    if code.startswith("design_unsupported:"):
+        return "시안 자동 생성은 지금 명함만 지원해요. 다른 상품은 완성된 파일을 올려주시면 도와드릴게요."
     if code == "slots_before_product":
         return "상품이 정해지면 말씀해 주신 사양을 바로 반영해드릴게요."
     if code == "file_received_need_product":
@@ -828,6 +964,25 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
         return "\n".join(parts)
 
     parts: list[str] = []
+
+    if d.request_card_fields:
+        parts.append(
+            "명함 시안을 만들어드릴게요. 이름과 회사명을 알려주시면 시작할 수 있어요. "
+            "직위·연락처·이메일도 함께 주시면 바로 반영할게요."
+        )
+
+    if d.design_generated:
+        tmpl = f"'{d.design_template_name}' 스타일" if d.design_template_name else "기본 스타일"
+        parts.append(
+            f"주신 정보로 {tmpl} 명함 시안을 만들어봤어요. 아래 미리보기를 확인해 주세요. "
+            "모던·클래식·미니멀 스타일 중에서 바꿔볼 수 있어요."
+        )
+
+    if d.offer_design and not d.design_generated:
+        parts.append(
+            "완성된 파일이 있으면 올려주셔도 되고, 없으시면 명함에 넣을 정보(이름·회사·직위·연락처)를 "
+            "알려주시면 시안을 바로 만들어드려요."
+        )
 
     if d.kind == "upload":
         parts.append("파일 잘 받았어요.")

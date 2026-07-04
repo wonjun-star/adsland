@@ -20,9 +20,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable, TypeVar
 
+from core.design.schema import DESIGNABLE_PRODUCTS, CardContent
 from core.llm import roles
 from core.llm.adapter import LLMAdapter, get_adapter
-from core.llm.parsing import ClassifyProposal, ParseError, SlotProposal
+from core.llm.parsing import ClassifyProposal, CustomerType, ParseError, SlotProposal
 from core.orchestrator.service import IntakeService, TurnResult
 from core.orchestrator.state_machine import State
 
@@ -55,7 +56,11 @@ class ChatPipeline:
         return result, self._render(result, self.adapter_provider())
 
     def process_message(self, session_id: str, text: str) -> tuple[TurnResult, str]:
-        """대화 1턴: (필요시) 분류 → 슬롯 파싱 → 서비스 적용 → 응답 생성."""
+        """대화 1턴: (필요시) 분류 → 슬롯 파싱 → 서비스 적용 → 응답 생성.
+
+        명함 시안 경로 분기: 파일 없는 명함 고객이 내용을 주거나 시안 제작을 요청하면
+        슬롯 파싱 대신 명함 내용 파서로 넘겨 시안 생성 흐름을 탄다.
+        """
         adapter = self.adapter_provider()
         view = self.service.view_session(session_id)
 
@@ -72,6 +77,12 @@ class ChatPipeline:
         product = view.product
         if not product and classify is not None and classify.product in self.service.catalog:
             product = classify.product
+
+        # 시안 경로 분기: 명함 + 파일 없음 + (이미 시안 모드 ∨ 내용 제공 ∨ 시안 제작 요청)
+        design_route = self._maybe_design(session_id, text, adapter, classify, view, product)
+        if design_route is not None:
+            return design_route
+
         schema = self.service.catalog.get(product) if product else None
         awaiting = view.state == State.PROOF_CONFIRM.value
 
@@ -84,6 +95,49 @@ class ChatPipeline:
 
         result = self.service.apply_turn(session_id, classify=classify, proposal=proposal)
         return result, self._render(result, adapter)
+
+    def _maybe_design(
+        self,
+        session_id: str,
+        text: str,
+        adapter: LLMAdapter | None,
+        classify: ClassifyProposal | None,
+        view,
+        product: str | None,
+    ) -> tuple[TurnResult, str] | None:
+        """명함 시안 경로 여부 판단 후, 맞으면 내용 파싱→생성까지 처리하고 반환."""
+        # 우리가 만든 시안(design_mode)은 계속 편집 허용. 고객이 올린 파일이면 시안 경로 진입 금지.
+        if product not in DESIGNABLE_PRODUCTS or (view.file_path and not view.design_mode):
+            return None
+
+        design_ask = classify is not None and classify.customer_type == CustomerType.C
+        content = self._propose(
+            session_id,
+            adapter,
+            llm=lambda: roles.parse_card_content(text, adapter),
+            rule=lambda: roles.parse_card_content(text, None),
+        )
+        template = roles.extract_template(text)
+
+        if view.design_mode:
+            # 이미 시안 모드: 내용 추가·수정 또는 템플릿 변경일 때만 재생성.
+            # 수량·확정 같은 메시지는 일반 흐름(슬롯 파싱)으로 흘려보낸다.
+            if not content.filled_fields() and not template:
+                return None
+        elif not (design_ask or content.is_generatable()):
+            # 시안 모드 진입 조건: 시안 제작 요청(C) 또는 생성 가능한 내용
+            return None
+
+        result = self.service.handle_card_content(session_id, content, template=template)
+        return result, self._render(result, adapter)
+
+    def process_design(
+        self, session_id: str, template: str | None = None, fields: dict | None = None
+    ) -> tuple[TurnResult, str]:
+        """UI에서 템플릿 변경·내용 수정 버튼 → 시안 재생성."""
+        content = CardContent(**(fields or {}))
+        result = self.service.handle_card_content(session_id, content, template=template)
+        return result, self._render(result, self.adapter_provider())
 
     def process_upload(
         self, session_id: str, saved_path: str | Path, original_name: str = ""
