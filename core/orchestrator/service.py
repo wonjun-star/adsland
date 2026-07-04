@@ -226,16 +226,21 @@ class IntakeService:
         merged_back = False
         sides_val = (row.slots or {}).get("sides", {}).get("value")
         back_side_product = bool(row.product) and self.catalog[row.product].slots.get("sides") is not None
-        # 앞면이 문제없이 통과한 상태에서 두 번째 파일이 오면 뒷면(양면)으로 본다.
-        # 앞면에 문제가 있었으면 두 번째는 '고쳐서 재업로드'로 보고 교체한다(뒷면 아님).
+        # 두 번째 파일 = 뒷면(양면)으로 본다. 단, 앞면에 '재업로드가 필요한' 문제(저해상도·폰트 등
+        # 자동 보정 불가·확인 필요)가 있었으면 두 번째는 '고쳐서 재업로드'로 보고 교체한다.
+        # 여백처럼 자동 보정 가능한 문제는 앞면으로 인정하고 뒷면 병합을 진행한다.
         prev_report = self._latest_report(session_id)
-        prev_clean = prev_report is not None and prev_report.gate_ok
+        prev_needs_reupload = prev_report is not None and any(
+            r.status == CheckStatus.UNCERTAIN
+            or (r.status == CheckStatus.FAIL and not r.autofix.available)
+            for r in prev_report.results
+        )
         if (
             prev_file
             and Path(prev_file).exists()
             and Path(prev_file).resolve() != dest.resolve()
             and self._page_count(prev_file) == 1
-            and (sides_val == "double" or (back_side_product and prev_clean))
+            and (sides_val == "double" or (back_side_product and not prev_needs_reupload))
         ):
             combined = dest_dir / "combined_front_back.pdf"
             if self._merge_front_back(Path(prev_file), dest, combined):
