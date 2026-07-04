@@ -206,13 +206,36 @@ class IntakeService:
         """PDF 업로드 → 보관 → (가능하면) FILE_CHECK 전이 → 프리플라이트 → 정책 재평가."""
         self.store.increment_turn(session_id)
         row = self._get(session_id)
+        prev_file = row.file_path  # 뒷면 병합 판단용 (앞면)
 
         dest_dir = UPLOAD_DIR / session_id
         dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = dest_dir / (Path(original_name).name or Path(src_path).name or "upload.pdf")
+        raw_name = Path(original_name).name or Path(src_path).name or "upload.pdf"
+        dest = dest_dir / raw_name
+        # 앞면을 덮어쓰지 않도록: 이름이 같으면 뒷면 접두사
+        if prev_file and Path(prev_file).name == raw_name and Path(prev_file).resolve() != Path(src_path).resolve():
+            dest = dest_dir / f"back_{raw_name}"
         if Path(src_path).resolve() != dest.resolve():
             shutil.copy2(src_path, dest)
-        self.store.set_file_path(session_id, str(dest))
+
+        # 뒷면 병합: 양면 지정 + 기존 앞면 1장이 있으면, 이번 업로드를 뒷면으로 보고 2페이지로 합친다
+        merged_back = False
+        if (
+            prev_file
+            and Path(prev_file).exists()
+            and Path(prev_file).resolve() != dest.resolve()
+            and (row.slots or {}).get("sides", {}).get("value") == "double"
+            and self._page_count(prev_file) == 1
+        ):
+            combined = dest_dir / "combined_front_back.pdf"
+            if self._merge_front_back(Path(prev_file), dest, combined):
+                self.store.set_file_path(session_id, str(combined))
+                self.store.record_event(
+                    session_id, "back_side_merged", {"front": prev_file, "back": str(dest)}
+                )
+                merged_back = True
+        if not merged_back:
+            self.store.set_file_path(session_id, str(dest))
 
         if State(row.state) == State.INTAKE:
             self.store.transition(session_id, State.CLASSIFY, "file_first")
@@ -241,6 +264,8 @@ class IntakeService:
             self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
 
         notices = [] if row.product else ["file_received_need_product"]
+        if merged_back:
+            notices.insert(0, "back_side_merged")
         result = self._advance(session_id, notices=notices, kind="upload", report=report)
         if detected:
             result.directives.detected_product = self.catalog[detected].display_name
@@ -305,6 +330,30 @@ class IntakeService:
         if best is None:
             return None
         return best[1] if best[0] <= 0.30 else None
+
+    def _page_count(self, path: str | Path) -> int | None:
+        import pikepdf
+
+        try:
+            with pikepdf.open(path) as pdf:
+                return len(pdf.pages)
+        except Exception:
+            return None
+
+    def _merge_front_back(self, front: Path, back: Path, out: Path) -> bool:
+        """앞면 PDF + 뒷면 PDF → 앞(1p)·뒤(2p) 2페이지로 합친다 (양면 접수)."""
+        import pikepdf
+
+        try:
+            pdf = pikepdf.open(front)
+            with pikepdf.open(back) as b:
+                for page in b.pages:
+                    pdf.pages.append(page)
+            pdf.save(out)
+            pdf.close()
+            return True
+        except Exception:
+            return False
 
     def _reclassify_reset(self, session_id: str) -> None:
         """상품이 바뀌었을 때: 이전 상품용 사양 슬롯을 비우고, 파일이 있으면 새 상품으로 재검판."""
