@@ -1,6 +1,7 @@
 // 어시스턴트 말풍선 아래에 붙는 결과 카드들 (docs/API.md cards[] 계약).
 // 카드의 숫자·판정은 전부 서버(결정론적 엔진) 출력이며 UI는 표기만 담당한다.
 
+import { Fragment } from 'react'
 import { fileUrl } from '../api'
 import {
   checkLabel,
@@ -22,6 +23,43 @@ const DESIGN_FIELD_ORDER = ['name', 'company', 'title', 'phone']
 function StatusBadge({ status }) {
   const meta = STATUS_META[status] || { label: status, className: 'unknown' }
   return <span className={`status-badge ${meta.className}`}>{meta.label}</span>
+}
+
+/** before/after 원시값을 사람이 읽는 텍스트로. 빈 값은 '—'. */
+function changeText(v) {
+  if (v === null || v === undefined || v === '') return '—'
+  return String(v)
+}
+
+/** 접수본→최종본 / 보정 전→후 등 두 이미지를 나란히. 이미지가 없으면 폴백 표시. */
+function BeforeAfter({
+  before,
+  after,
+  beforeAlt,
+  afterAlt,
+  beforeLabel = '보정 전',
+  afterLabel = '보정 후',
+  variant,
+}) {
+  const b = fileUrl(before)
+  const a = fileUrl(after)
+  return (
+    <div className={variant ? `fix-compare ${variant}` : 'fix-compare'}>
+      <figure>
+        <div className="preview-frame">
+          {b ? <img src={b} alt={beforeAlt} /> : <span className="preview-empty">미리보기 없음</span>}
+        </div>
+        <figcaption>{beforeLabel}</figcaption>
+      </figure>
+      <svg className="fix-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14m0 0l-5-5m5 5l-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      <figure>
+        <div className="preview-frame after">
+          {a ? <img src={a} alt={afterAlt} /> : <span className="preview-empty">미리보기 없음</span>}
+        </div>
+        <figcaption className="after-label">{afterLabel}</figcaption>
+      </figure>
+    </div>
+  )
 }
 
 function PreflightCard({ card, latest, busy, onAutofix }) {
@@ -50,25 +88,49 @@ function PreflightCard({ card, latest, busy, onAutofix }) {
             </tr>
           </thead>
           <tbody>
-            {results.map((r) => (
-              <tr key={r.check_id}>
-                <th scope="row">{checkLabel(r.check_id)}</th>
-                <td><StatusBadge status={r.status} /></td>
-                <td className="measured">{measuredSummary(r)}</td>
-                <td className="action-cell">
-                  {latest && r.status === 'fail' && r.autofix?.available && (
-                    <button
-                      type="button"
-                      className="btn small accent"
-                      disabled={busy}
-                      onClick={() => onAutofix(r.check_id)}
-                    >
-                      자동 보정 적용
-                    </button>
+            {results.map((r) => {
+              const meta = STATUS_META[r.status] || { className: 'unknown' }
+              const hasMessage = Boolean(r.message)
+              const isProblem = r.status !== 'pass'
+              return (
+                <Fragment key={r.check_id}>
+                  <tr className={hasMessage ? 'has-message' : undefined}>
+                    <th scope="row">{checkLabel(r.check_id)}</th>
+                    <td><StatusBadge status={r.status} /></td>
+                    <td className="measured">{measuredSummary(r)}</td>
+                    <td className="action-cell">
+                      {latest && r.status === 'fail' && r.autofix?.available && (
+                        <button
+                          type="button"
+                          className="btn small accent"
+                          disabled={busy}
+                          onClick={() => onAutofix(r.check_id)}
+                        >
+                          자동 보정 적용
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                  {hasMessage && isProblem && (
+                    <tr className="message-row">
+                      <td colSpan={4}>
+                        <p className={`check-message ${meta.className}`}>{r.message}</p>
+                      </td>
+                    </tr>
                   )}
-                </td>
-              </tr>
-            ))}
+                  {hasMessage && !isProblem && (
+                    <tr className="message-row">
+                      <td colSpan={4}>
+                        <details className="check-message-toggle">
+                          <summary>설명 보기</summary>
+                          <p className={`check-message ${meta.className}`}>{r.message}</p>
+                        </details>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -78,12 +140,17 @@ function PreflightCard({ card, latest, busy, onAutofix }) {
 
 function QuoteCard({ card }) {
   const lines = card.lines || []
+  const estimate = card.estimate === true
   return (
     <div className="card">
       <div className="card-title">
-        견적서
+        {estimate ? '예상 견적' : '견적서'}
         {card.product && <span className="card-title-sub">{productLabel(card.product)}</span>}
+        {estimate && <span className="estimate-badge">추정가</span>}
       </div>
+      {estimate && (
+        <p className="estimate-note">사양이 확정되면 정확한 금액으로 업데이트돼요.</p>
+      )}
       <div className="table-scroll">
         <table className="quote-table">
           <tbody>
@@ -108,7 +175,10 @@ function QuoteCard({ card }) {
           </tbody>
           <tfoot>
             <tr className="total">
-              <th scope="row">합계{card.vat_included !== false ? ' (부가세 포함)' : ''}</th>
+              <th scope="row">
+                {estimate ? '예상 합계' : '합계'}
+                {card.vat_included !== false ? ' (부가세 포함)' : ''}
+              </th>
               <td className="amount total-amount">{money(card.total)}</td>
             </tr>
           </tfoot>
@@ -119,25 +189,18 @@ function QuoteCard({ card }) {
 }
 
 function AutofixPreviewCard({ card }) {
-  const before = fileUrl(card.before_url ?? card.before)
-  const after = fileUrl(card.after_url ?? card.after)
   return (
     <div className="card">
       <div className="card-title">
         자동 보정 결과
         <span className="card-title-sub">{checkLabel(card.check_id)}</span>
       </div>
-      <div className="fix-compare">
-        <figure>
-          <div className="preview-frame"><img src={before} alt="보정 전 미리보기" /></div>
-          <figcaption>보정 전</figcaption>
-        </figure>
-        <svg className="fix-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14m0 0l-5-5m5 5l-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        <figure>
-          <div className="preview-frame after"><img src={after} alt="보정 후 미리보기" /></div>
-          <figcaption className="after-label">보정 후</figcaption>
-        </figure>
-      </div>
+      <BeforeAfter
+        before={card.before_url ?? card.before}
+        after={card.after_url ?? card.after}
+        beforeAlt="보정 전 미리보기"
+        afterAlt="보정 후 미리보기"
+      />
     </div>
   )
 }
@@ -149,6 +212,69 @@ function FilePreviewCard({ card }) {
       <div className="preview-frame single">
         <img src={fileUrl(card.url)} alt="업로드한 파일의 1페이지 미리보기" />
       </div>
+    </div>
+  )
+}
+
+function ChangeItem({ item }) {
+  const label = item.label || checkLabel(item.check_id) || '변경 항목'
+  const hasDelta = item.before !== undefined || item.after !== undefined
+  const hasImages = Boolean(item.before_url || item.after_url)
+  return (
+    <li className="change-item">
+      <div className="change-item-head">
+        <span className="change-label">{label}</span>
+        {hasDelta && (
+          <span className="change-delta">
+            <span className="before">{changeText(item.before)}</span>
+            <span className="change-arrow" aria-hidden="true">→</span>
+            <span className="after">{changeText(item.after)}</span>
+          </span>
+        )}
+      </div>
+      {hasImages && (
+        <BeforeAfter
+          before={item.before_url}
+          after={item.after_url}
+          beforeAlt={`${label} 변경 전`}
+          afterAlt={`${label} 변경 후`}
+          beforeLabel="변경 전"
+          afterLabel="변경 후"
+        />
+      )}
+    </li>
+  )
+}
+
+function ChangeSummaryCard({ card }) {
+  const items = card.items || []
+  const hasHero = Boolean(card.original_url || card.final_url)
+  return (
+    <div className="card change-summary">
+      <div className="card-title">
+        변경 내역 (접수본 → 최종본)
+        {card.product && <span className="card-title-sub">{productLabel(card.product)}</span>}
+      </div>
+      {hasHero && (
+        <BeforeAfter
+          variant="hero"
+          before={card.original_url}
+          after={card.final_url}
+          beforeAlt="접수본 미리보기"
+          afterAlt="최종본 미리보기"
+          beforeLabel="접수본"
+          afterLabel="최종본"
+        />
+      )}
+      {items.length > 0 ? (
+        <ul className="change-list">
+          {items.map((item, i) => (
+            <ChangeItem key={i} item={item} />
+          ))}
+        </ul>
+      ) : (
+        !hasHero && <p className="change-empty">표시할 변경 내역이 없어요.</p>
+      )}
     </div>
   )
 }
@@ -178,6 +304,8 @@ function EscalationCard({ card }) {
 function OrderConfirmedCard({ card }) {
   const summary = card.summary || {}
   const slots = summary.slots || {}
+  const finalUrl = fileUrl(card.final_url)
+  const changes = card.changes || []
   return (
     <div className="card order-confirmed">
       <div className="order-head">
@@ -195,6 +323,23 @@ function OrderConfirmedCard({ card }) {
         <span>주문번호</span>
         <code>{card.order_no}</code>
       </div>
+
+      {(finalUrl || card.file_name) && (
+        <div className="order-final">
+          {finalUrl && (
+            <div className="preview-frame single">
+              <img src={finalUrl} alt="최종 확정본 미리보기" />
+            </div>
+          )}
+          {card.file_name && (
+            <div className="order-file">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2.5h6L15.5 7v11h-11z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /><path d="M11 2.5V7h4.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>
+              <span>{card.file_name}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="table-scroll">
         <table className="spec-table">
           <tbody>
@@ -221,6 +366,28 @@ function OrderConfirmedCard({ card }) {
           </tbody>
         </table>
       </div>
+
+      {changes.length > 0 && (
+        <div className="order-changes">
+          <div className="order-changes-head">접수본에서 이렇게 조정됐어요</div>
+          <ul className="change-list">
+            {changes.map((c, i) => (
+              <li key={i} className="change-item">
+                <div className="change-item-head">
+                  <span className="change-label">{c.label}</span>
+                  {(c.before !== undefined || c.after !== undefined) && (
+                    <span className="change-delta">
+                      <span className="before">{changeText(c.before)}</span>
+                      <span className="change-arrow" aria-hidden="true">→</span>
+                      <span className="after">{changeText(c.after)}</span>
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
@@ -288,6 +455,8 @@ function Card({ card, latest, busy, onAutofix, onDesign }) {
       return <QuoteCard card={card} />
     case 'autofix_preview':
       return <AutofixPreviewCard card={card} />
+    case 'change_summary':
+      return <ChangeSummaryCard card={card} />
     case 'file_preview':
       return <FilePreviewCard card={card} />
     case 'design_preview':

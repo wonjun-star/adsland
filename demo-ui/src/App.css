@@ -961,6 +961,228 @@ textarea {
   font-weight: 800;
 }
 
+/* ------------------------------------------------ 예상 견적 뱃지/안내 */
+
+.estimate-badge {
+  display: inline-block;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 9px;
+  letter-spacing: 0;
+}
+
+.estimate-note {
+  font-size: 12.5px;
+  color: var(--muted);
+  background: var(--surface-deep);
+  border-radius: 8px;
+  padding: 7px 12px;
+  margin-top: -2px;
+}
+
+/* ------------------------------------------------ 검판 항목별 설명(message) */
+
+/* 설명 행이 붙는 검사 행은 아래 경계선을 지워 한 덩어리로 묶는다. */
+.check-table tr.has-message th,
+.check-table tr.has-message td {
+  border-bottom: none;
+  padding-bottom: 3px;
+}
+
+.check-table .message-row td {
+  padding: 0 10px 10px 0;
+}
+
+.check-message {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.check-message.pass {
+  border-left-color: var(--ok);
+}
+
+.check-message.warn {
+  border-left-color: var(--warn);
+}
+
+.check-message.fail {
+  border-left-color: var(--fail);
+}
+
+.check-message.uncertain {
+  border-left-color: var(--uncertain);
+}
+
+.check-message-toggle summary {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+  cursor: pointer;
+  list-style: none;
+  padding: 2px 0;
+  width: fit-content;
+}
+
+.check-message-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+.check-message-toggle summary::before {
+  content: "＋";
+  margin-right: 5px;
+  font-weight: 700;
+}
+
+.check-message-toggle[open] summary::before {
+  content: "－";
+}
+
+.check-message-toggle[open] summary {
+  margin-bottom: 6px;
+}
+
+/* ------------------------------------------------ 이미지 폴백/전후 크게 */
+
+.preview-empty {
+  font-size: 12.5px;
+  color: var(--faint);
+  padding: 24px 8px;
+  text-align: center;
+}
+
+.fix-compare.hero figure {
+  flex: 1 1 220px;
+}
+
+.fix-compare.hero .preview-frame img {
+  max-height: 320px;
+}
+
+.fix-compare.hero figcaption {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ------------------------------------------------ 변경 내역(change_summary) */
+
+.change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.change-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.change-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.change-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.change-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.change-delta .before {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--faint);
+}
+
+.change-delta .change-arrow {
+  color: var(--faint);
+  font-weight: 700;
+}
+
+.change-delta .after {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.change-empty {
+  font-size: 13px;
+  color: var(--faint);
+}
+
+/* ------------------------------------------------ 주문 확정 확장(최종본/조정내역) */
+
+.order-final {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-final .preview-frame.single {
+  max-width: 260px;
+  flex: 0 1 auto;
+}
+
+.order-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-deep);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.order-file svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--muted);
+}
+
+.order-changes {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.order-changes-head {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
 /* ---------------------------------------------------------------- 확정 바 */
 
 .confirm-bar {
