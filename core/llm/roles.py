@@ -964,7 +964,7 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
     if code == "need_back_side_file":
         return "양면으로 진행하려면 뒷면 파일도 올려주세요. (지금은 앞면 1장만 받았어요)"
     if code == "back_side_merged":
-        return "뒷면까지 받았어요 — 앞뒤 양면으로 합쳐서 검판했어요."
+        return "두 번째 파일은 뒷면으로 봤어요 — 앞뒤 양면으로 합쳐서 검판했어요. 한 면만 하실 거면 알려주세요."
     return None  # quote_missing 등 내부 코드는 질문/에스컬레이션이 따로 안내한다
 
 

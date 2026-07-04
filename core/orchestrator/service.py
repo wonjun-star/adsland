@@ -218,18 +218,27 @@ class IntakeService:
         if Path(src_path).resolve() != dest.resolve():
             shutil.copy2(src_path, dest)
 
-        # 뒷면 병합: 양면 지정 + 기존 앞면 1장이 있으면, 이번 업로드를 뒷면으로 보고 2페이지로 합친다
+        # 뒷면 병합: 앞면 1장이 이미 있고, 이번이 두 번째 파일이면 뒷면으로 보고 2페이지로 합친다.
+        # "양면"이라 말하지 않아도 — 파일을 둘 올린다는 것 자체가 앞뒤 신호다(명함·엽서 등 양면 상품).
+        # 이미 양면으로 정했으면 당연히 병합.
         merged_back = False
+        sides_val = (row.slots or {}).get("sides", {}).get("value")
+        back_side_product = bool(row.product) and self.catalog[row.product].slots.get("sides") is not None
+        # 앞면이 문제없이 통과한 상태에서 두 번째 파일이 오면 뒷면(양면)으로 본다.
+        # 앞면에 문제가 있었으면 두 번째는 '고쳐서 재업로드'로 보고 교체한다(뒷면 아님).
+        prev_report = self._latest_report(session_id)
+        prev_clean = prev_report is not None and prev_report.gate_ok
         if (
             prev_file
             and Path(prev_file).exists()
             and Path(prev_file).resolve() != dest.resolve()
-            and (row.slots or {}).get("sides", {}).get("value") == "double"
             and self._page_count(prev_file) == 1
+            and (sides_val == "double" or (back_side_product and prev_clean))
         ):
             combined = dest_dir / "combined_front_back.pdf"
             if self._merge_front_back(Path(prev_file), dest, combined):
                 self.store.set_file_path(session_id, str(combined))
+                self.store.set_slot(session_id, "sides", "double", source="inferred")
                 self.store.record_event(
                     session_id, "back_side_merged", {"front": prev_file, "back": str(dest)}
                 )
