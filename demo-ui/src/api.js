@@ -45,6 +45,16 @@ export async function api(path, { method = 'GET', body, formData } = {}) {
   return res.json()
 }
 
+/**
+ * 명함 시안 생성/재생성 (POST /api/session/{id}/design).
+ * 템플릿 전환은 {template}, 내용 수정은 {fields} 를 담아 보낸다. 응답은 공통 형태.
+ * @param {string} sessionId
+ * @param {{template?: string, fields?: object}} body
+ */
+export function designTemplate(sessionId, body) {
+  return api(`/api/session/${sessionId}/design`, { method: 'POST', body })
+}
+
 /** 서버가 준 파일 경로/URL → 브라우저가 접근 가능한 URL (GET /api/files/{name}) */
 export function fileUrl(pathOrUrl) {
   if (!pathOrUrl) return ''

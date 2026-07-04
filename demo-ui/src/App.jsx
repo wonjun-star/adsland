@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
-import { api, ApiError } from './api'
+import { api, ApiError, designTemplate } from './api'
 import AccessGate from './components/AccessGate'
 import BoardPanel from './components/BoardPanel'
 import ChatPane from './components/ChatPane'
@@ -121,6 +121,15 @@ export default function App() {
     [session, busy, push, runTurn],
   )
 
+  const applyDesign = useCallback(
+    (template, name) => {
+      if (!session || busy) return
+      push({ role: 'user', text: name ? `'${name}' 템플릿으로 보여 주세요.` : '다른 템플릿으로 보여 주세요.' })
+      runTurn(() => designTemplate(session.id, { template }))
+    },
+    [session, busy, push, runTurn],
+  )
+
   const confirmOrder = useCallback(() => {
     if (!session || busy) return
     push({ role: 'user', text: '네, 이대로 확정할게요.' })
@@ -185,6 +194,7 @@ export default function App() {
           onSend={sendMessage}
           onUpload={uploadFile}
           onAutofix={applyAutofix}
+          onDesign={applyDesign}
           onConfirm={confirmOrder}
           onReject={rejectConfirm}
         />

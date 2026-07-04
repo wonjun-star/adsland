@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import TurnCards from './Cards'
 
-function Message({ msg, latest, busy, onQuick, onAutofix }) {
+function Message({ msg, latest, busy, onQuick, onAutofix, onDesign }) {
   if (msg.role === 'system') {
     return <div className="msg-system">{msg.text}</div>
   }
@@ -24,7 +24,7 @@ function Message({ msg, latest, busy, onQuick, onAutofix }) {
       <div className="avatar" aria-hidden="true">AI</div>
       <div className="msg-body">
         {msg.text && <div className="bubble assistant">{msg.text}</div>}
-        <TurnCards cards={msg.cards} latest={latest} busy={busy} onAutofix={onAutofix} />
+        <TurnCards cards={msg.cards} latest={latest} busy={busy} onAutofix={onAutofix} onDesign={onDesign} />
         {latest && !busy && msg.quickOptions?.length > 0 && (
           <div className="quick-options">
             {msg.quickOptions.map((opt, i) => (
@@ -39,7 +39,7 @@ function Message({ msg, latest, busy, onQuick, onAutofix }) {
   )
 }
 
-export default function ChatPane({ messages, busy, session, onSend, onUpload, onAutofix, onConfirm, onReject }) {
+export default function ChatPane({ messages, busy, session, onSend, onUpload, onAutofix, onDesign, onConfirm, onReject }) {
   const [draft, setDraft] = useState('')
   const [dragging, setDragging] = useState(false)
   const endRef = useRef(null)
@@ -108,6 +108,7 @@ export default function ChatPane({ messages, busy, session, onSend, onUpload, on
             busy={busy}
             onQuick={onSend}
             onAutofix={onAutofix}
+            onDesign={onDesign}
           />
         ))}
         {busy && (

@@ -22,15 +22,16 @@ from evals.run_dialog_eval import (
 # ---------------------------------------------------------------- 시나리오 구성
 
 
-def test_scenarios_are_15_with_5_5_5_mix():
+def test_scenarios_are_16_with_5_5_6_mix():
+    """A유형 5, B유형 5, 엣지 6 (명함 시안 생성 해피패스 e6 추가)."""
     scenarios = load_scenarios()
-    assert len(scenarios) == 15
+    assert len(scenarios) == 16
     ids = [s["id"] for s in scenarios]
-    assert len(set(ids)) == 15, "시나리오 id 중복"
+    assert len(set(ids)) == 16, "시나리오 id 중복"
     by_type = [scenario_type(i) for i in ids]
     assert by_type.count("A") == 5
     assert by_type.count("B") == 5
-    assert by_type.count("EDGE") == 5
+    assert by_type.count("EDGE") == 6
 
 
 def test_scenario_steps_use_known_step_kinds():
@@ -166,6 +167,6 @@ def test_rule_mode_meets_m4_goals(tmp_path):
 
     # 리포트 파일이 계약 형태로 저장된다
     data = json.loads(report_path.read_text(encoding="utf-8"))
-    assert data["summary"]["total"] == 15
-    assert len(data["scenarios"]) == 15
+    assert data["summary"]["total"] == 16
+    assert len(data["scenarios"]) == 16
     assert {"id", "passed", "questions", "criticals"} <= set(data["scenarios"][0])

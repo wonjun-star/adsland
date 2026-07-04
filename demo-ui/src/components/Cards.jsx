@@ -4,6 +4,8 @@
 import { fileUrl } from '../api'
 import {
   checkLabel,
+  designFieldLabel,
+  designFieldValue,
   escalationLabel,
   measuredSummary,
   money,
@@ -13,6 +15,9 @@ import {
   slotValueLabel,
   STATUS_META,
 } from '../labels'
+import CardViewer3D from './CardViewer3D'
+
+const DESIGN_FIELD_ORDER = ['name', 'company', 'title', 'phone']
 
 function StatusBadge({ status }) {
   const meta = STATUS_META[status] || { label: status, className: 'unknown' }
@@ -220,7 +225,62 @@ function OrderConfirmedCard({ card }) {
   )
 }
 
-function Card({ card, latest, busy, onAutofix }) {
+function DesignPreviewCard({ card, latest, busy, onDesign }) {
+  const templates = card.templates || []
+  const current = card.template
+  const currentName = templates.find((t) => t.id === current)?.name || current
+  const fields = card.fields || {}
+  const rows = DESIGN_FIELD_ORDER.filter((k) => fields[k] !== null && fields[k] !== undefined && fields[k] !== '')
+
+  return (
+    <div className="card">
+      <div className="card-title">
+        명함 시안
+        {currentName && <span className="card-title-sub">{currentName}</span>}
+      </div>
+
+      <CardViewer3D previewUrl={card.preview_url} label={`${currentName || '명함'} 시안 미리보기`} />
+      <p className="design-hint">드래그해서 돌려보세요</p>
+
+      {templates.length > 0 && (
+        <div className="design-templates" role="group" aria-label="템플릿 선택">
+          {templates.map((t) => {
+            const active = t.id === current
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className={active ? 'btn small accent' : 'btn small'}
+                aria-pressed={active}
+                disabled={busy || !latest || active}
+                onClick={() => onDesign?.(t.id, t.name)}
+              >
+                {t.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div className="table-scroll">
+          <table className="design-fields">
+            <tbody>
+              {rows.map((k) => (
+                <tr key={k}>
+                  <th scope="row">{designFieldLabel(k)}</th>
+                  <td>{designFieldValue(k, fields[k])}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Card({ card, latest, busy, onAutofix, onDesign }) {
   switch (card.type) {
     case 'preflight_report':
       return <PreflightCard card={card} latest={latest} busy={busy} onAutofix={onAutofix} />
@@ -230,6 +290,8 @@ function Card({ card, latest, busy, onAutofix }) {
       return <AutofixPreviewCard card={card} />
     case 'file_preview':
       return <FilePreviewCard card={card} />
+    case 'design_preview':
+      return <DesignPreviewCard card={card} latest={latest} busy={busy} onDesign={onDesign} />
     case 'escalation':
       return <EscalationCard card={card} />
     case 'order_confirmed':
@@ -239,12 +301,12 @@ function Card({ card, latest, busy, onAutofix }) {
   }
 }
 
-export default function TurnCards({ cards, latest, busy, onAutofix }) {
+export default function TurnCards({ cards, latest, busy, onAutofix, onDesign }) {
   if (!cards || cards.length === 0) return null
   return (
     <div className="cards">
       {cards.map((card, i) => (
-        <Card key={i} card={card} latest={latest} busy={busy} onAutofix={onAutofix} />
+        <Card key={i} card={card} latest={latest} busy={busy} onAutofix={onAutofix} onDesign={onDesign} />
       ))}
     </div>
   )

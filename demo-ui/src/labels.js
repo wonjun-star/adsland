@@ -78,6 +78,32 @@ export const SOURCE_LABELS = {
   default: '기본값',
 }
 
+// ---------------------------------------------------------------- 명함 시안 필드
+
+export const DESIGN_FIELD_LABELS = {
+  name: '이름',
+  company: '회사',
+  title: '직위',
+  phone: '연락처',
+}
+
+export function designFieldLabel(key) {
+  return DESIGN_FIELD_LABELS[key] || key
+}
+
+function formatPhone(raw) {
+  const d = raw.replace(/\D/g, '')
+  if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`
+  if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`
+  return raw
+}
+
+export function designFieldValue(key, value) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (key === 'phone') return formatPhone(String(value))
+  return String(value)
+}
+
 // ---------------------------------------------------------------- 세션 상태
 
 export const STATE_LABELS = {
