@@ -16,10 +16,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from synth.generate_clean import DEFAULT_SEED, PROJECT_ROOT, PRODUCTS, generate
+from synth.generate_clean import CORE_PRODUCTS, DEFAULT_SEED, PROJECT_ROOT, generate
 from synth.manifest import Manifest, ManifestEntry, save_manifest
 
-#: 정상 변형 수 (상품 5종 × 2 = 10)
+#: 정상 변형 수 (상품 5종 × 2 = 10). eval 코퍼스는 CORE_PRODUCTS(기존 5종)로 고정 —
+#: generate_clean.PRODUCTS 에 신규 상품이 늘어도 코퍼스/manifest 정답은 그대로여야 한다.
 CLEAN_VARIANTS = 2
 
 #: 단일 결함 25종: (결함 id, 상품, 파라미터 오버라이드)
@@ -102,7 +103,7 @@ def build_corpus(
 
     # 1) 정상 10종 (5상품 × 2변형)
     i = 0
-    for product in PRODUCTS:
+    for product in CORE_PRODUCTS:
         for variant in range(CLEAN_VARIANTS):
             i += 1
             name = f"clean_{i:02d}_{product}_v{variant + 1}.pdf"

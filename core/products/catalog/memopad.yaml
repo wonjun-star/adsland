@@ -1,0 +1,48 @@
+# 떡메모지 슬롯 스키마 — core/products/schema.py::ProductSchema 형식 (docs/PLAN.md §7)
+# size.choices 는 core/quote/pricebook.yaml 의 memopad 사이즈 키와 1:1 로 일치해야 한다.
+# 떡메모지는 보통 단면·무코팅이라 sides/coating/cut_type 슬롯을 두지 않는다.
+# 수량은 낱장이 아니라 '권'(묶음) 단위로 센다.
+product: memopad
+display_name: 떡메모지
+slots:
+  size:
+    display_name: 사이즈
+    required: true
+    infer_from: [file_trimbox]        # 파일 재단크기(TrimBox)에서 추론
+    ask_if_conflict: true             # 추론값과 고객 발화가 다르면 확인
+    choices: ["100x100", "76x76"]
+    unit: mm
+    synonyms:
+      "정사각": "100x100"
+      "큰 사이즈": "100x100"
+      "십센치": "100x100"
+      "작은 사이즈": "76x76"
+      "미니": "76x76"
+      "칠센치": "76x76"
+  quantity:
+    display_name: 수량
+    required: true
+    infer_from: []
+    quick_options: [1, 5, 10]
+    unit: 권
+    synonyms:
+      "한 권": 1
+      "다섯 권": 5
+      "열 권": 10
+  material:
+    display_name: 용지
+    required: true
+    default: woodfree_100
+    risk_if_defaulted: low
+    choices: [woodfree_100, woodfree_80]
+    synonyms:
+      "모조지": woodfree_100
+      "백색 모조지": woodfree_100
+      "기본": woodfree_100
+      "일반": woodfree_100
+      "도톰한": woodfree_100
+      "얇은": woodfree_80
+      "가벼운": woodfree_80
+      "저렴한": woodfree_80
+gates:
+  production: [preflight_all_pass, customer_confirmed, no_escalation]

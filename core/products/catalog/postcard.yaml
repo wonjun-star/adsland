@@ -1,0 +1,82 @@
+# 엽서 슬롯 스키마 — core/products/schema.py::ProductSchema 형식 (docs/PLAN.md §7)
+# size.choices 는 core/quote/pricebook.yaml 의 postcard 사이즈 키와 1:1 로 일치해야 한다.
+# 낱장 인쇄물이라 재단 형태(cut_type) 슬롯은 두지 않는다 (칼선 없음).
+product: postcard
+display_name: 엽서
+slots:
+  size:
+    display_name: 사이즈
+    required: true
+    infer_from: [file_trimbox]        # 파일 재단크기(TrimBox)에서 추론
+    ask_if_conflict: true             # 추론값과 고객 발화가 다르면 확인
+    choices: ["100x148", "148x210"]
+    unit: mm
+    synonyms:
+      "엽서 크기": "100x148"
+      "일반 엽서": "100x148"
+      "표준": "100x148"
+      "국제 엽서": "100x148"
+      "에이오": "148x210"
+      "큰 엽서": "148x210"
+      "엽서 두 배": "148x210"
+  quantity:
+    display_name: 수량
+    required: true
+    infer_from: []
+    quick_options: [100, 500, 1000]
+    unit: 매
+    synonyms:
+      "백 장": 100
+      "천 장": 1000
+  material:
+    display_name: 용지
+    required: true
+    default: snow_250
+    risk_if_defaulted: low
+    choices: [snow_250, art_250, rendezvous_240]
+    synonyms:
+      "스노우지": snow_250
+      "기본": snow_250
+      "무난한": snow_250
+      "무광지": snow_250
+      "아트지": art_250
+      "매끈한": art_250
+      "광택지": art_250
+      "반질반질한": art_250
+      "랑데뷰": rendezvous_240
+      "고급": rendezvous_240
+      "고급스러운": rendezvous_240
+      "질감 있는": rendezvous_240
+      "수입지": rendezvous_240
+  coating:
+    display_name: 코팅
+    required: false
+    default: matte
+    risk_if_defaulted: low
+    choices: ["none", matte, gloss]
+    synonyms:
+      "무광": matte
+      "무광 코팅": matte
+      "매트": matte
+      "유광": gloss
+      "광택": gloss
+      "반짝이는 코팅": gloss
+      "코팅 없이": "none"
+      "코팅 빼고": "none"
+  sides:
+    display_name: 인쇄면
+    required: true
+    infer_from: [file_page_count]     # 파일 1p → 단면, 2p → 양면 추정
+    default: single
+    risk_if_defaulted: low
+    choices: [single, double]
+    synonyms:
+      "단면": single
+      "한 면만": single
+      "앞면만": single
+      "양면": double
+      "앞뒤": double
+      "앞뒤로": double
+      "뒷면까지": double
+gates:
+  production: [preflight_all_pass, customer_confirmed, no_escalation]

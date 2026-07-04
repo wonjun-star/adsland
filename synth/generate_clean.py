@@ -69,14 +69,23 @@ class ProductSpec:
     dieline: bool  # CutContour 별색 칼선 포함 여부
 
 
-#: 상품 5종 기본 규격 (재단 크기 기준)
+#: 상품 8종 기본 규격 (재단 크기 기준). 앞 5종은 eval 코퍼스 기준(CORE_PRODUCTS),
+#: 뒤 3종은 데모 쇼케이스용 신규 낱장 인쇄물(엽서·떡메모지·포토카드, 칼선 없음).
 PRODUCTS: dict[str, ProductSpec] = {
     "sticker": ProductSpec("sticker", (90.0, 90.0), dieline=True),
     "namecard": ProductSpec("namecard", (90.0, 50.0), dieline=False),
     "flyer": ProductSpec("flyer", (148.0, 210.0), dieline=False),
     "poster": ProductSpec("poster", (420.0, 594.0), dieline=False),
     "label": ProductSpec("label", (60.0, 60.0), dieline=True),
+    "postcard": ProductSpec("postcard", (100.0, 148.0), dieline=False),
+    "memopad": ProductSpec("memopad", (100.0, 100.0), dieline=False),
+    "photocard": ProductSpec("photocard", (55.0, 85.0), dieline=False),
 }
+
+#: eval 코퍼스(inject_defects) 가 쓰는 기존 5종. manifest.json/corpus 의 정답은 이 5종에
+#: 고정되어 있으므로, PRODUCTS 에 신규 상품을 추가해도 코퍼스 구성은 흔들리면 안 된다.
+#: 신규 3종은 synth/showcase.py 의 데모 세트에서만 쓴다.
+CORE_PRODUCTS: tuple[str, ...] = ("sticker", "namecard", "flyer", "poster", "label")
 
 # 변형(variant)별 배경/밴드 색 — 전부 DeviceCMYK, 잉크 합이 낮게 (배경 ≤30%, 밴드 ≤130%)
 _BG_COLORS = [(0.02, 0.06, 0.18, 0.00), (0.14, 0.02, 0.05, 0.00)]
@@ -443,10 +452,10 @@ def generate(
 
 
 def main() -> None:
-    """CLI: 상품 5종 정상 PDF → data/samples/clean/"""
+    """CLI: 기존 상품 5종 정상 PDF → data/samples/clean/ (신규 3종은 showcase 세트에서 다룸)"""
     out_dir = PROJECT_ROOT / "data" / "samples" / "clean"
     out_dir.mkdir(parents=True, exist_ok=True)
-    for name in PRODUCTS:
+    for name in CORE_PRODUCTS:
         path = out_dir / f"clean_{name}.pdf"
         generate(name, path)
         print(f"[synth] 정상 샘플 생성: {path}")

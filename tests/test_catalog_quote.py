@@ -1,10 +1,11 @@
-"""카탈로그 5종 + 견적 엔진 테스트.
+"""카탈로그 8종 + 견적 엔진 테스트.
 
 검증 대상:
-  1) catalog/*.yaml 5종이 ProductSchema 로 로드되고 필수 슬롯이 존재한다
+  1) catalog/*.yaml 8종이 ProductSchema 로 로드되고 필수 슬롯이 존재한다
   2) 카탈로그의 size/material/coating 값이 pricebook 매트릭스와 1:1 로 일치한다
   3) 견적 조회 성공(기본가 + 후가공 가산 + VAT) / 실패(missing, 추정 금지) 동작
   4) synonyms(고객 언어→스펙)가 스키마 데이터로 로드된다
+  5) 신규 3종(엽서/떡메모지/포토카드)이 로드·견적된다
 """
 
 from __future__ import annotations
@@ -13,7 +14,11 @@ import yaml
 from core.products.schema import Risk, load_catalog
 from core.quote.engine import PRICEBOOK_PATH, QuoteResult, quote
 
+# 기존 5종 — coating/sides 등 슬롯 구성이 공통이라 아래 공통 루프가 이 집합을 돈다.
 PRODUCT_IDS = {"sticker", "namecard", "flyer", "poster", "label"}
+# 신규 3종(낱장, 칼선 없음). 떡메모지는 coating/sides 가 없어 별도 루프로 검증한다.
+NEW_PRODUCT_IDS = {"postcard", "memopad", "photocard"}
+ALL_PRODUCT_IDS = PRODUCT_IDS | NEW_PRODUCT_IDS
 
 
 def _pricebook() -> dict:
@@ -24,9 +29,9 @@ def _pricebook() -> dict:
 # ──────────────────────────────── 카탈로그 로드 ────────────────────────────────
 
 
-def test_catalog_loads_five_products():
+def test_catalog_loads_all_products():
     catalog = load_catalog()
-    assert set(catalog.keys()) == PRODUCT_IDS
+    assert set(catalog.keys()) == ALL_PRODUCT_IDS
     # display_name 은 한국어로 채워져 있어야 한다
     for schema in catalog.values():
         assert schema.display_name, schema.product
@@ -246,3 +251,142 @@ def test_quote_unsupported_addon_returns_missing():
     assert result is not None
     assert result.missing == ["coating=gloss"]
     assert result.total == 0 and result.lines == []
+
+
+# ════════════════════════════ 신규 3종 (엽서·떡메모지·포토카드) ════════════════════════════
+
+
+def test_new_products_have_core_and_lineitem_slots():
+    """신규 3종의 필수 슬롯 구성 — 낱장이라 cut_type 없음, 상품별 sides/coating 유무 확인."""
+    catalog = load_catalog()
+    for pid in NEW_PRODUCT_IDS:
+        slots = catalog[pid].slots
+        for name in ("size", "quantity", "material"):
+            assert name in slots and slots[name].required, f"{pid}.{name}"
+        assert "cut_type" not in slots, f"{pid}: 낱장 상품엔 재단 형태 슬롯이 없어야 함"
+    # 엽서·포토카드: 단/양면 축 존재
+    for pid in ("postcard", "photocard"):
+        assert set(catalog[pid].slots["sides"].choices) == {"single", "double"}, pid
+        assert catalog[pid].slots["coating"].default == "matte", pid
+    # 떡메모지: sides/coating 없음, 수량 단위는 '권'
+    memo = catalog["memopad"].slots
+    assert "sides" not in memo and "coating" not in memo
+    assert memo["quantity"].unit == "권"
+
+
+def test_new_products_sizes_match_pricebook():
+    catalog = load_catalog()
+    book = _pricebook()
+    for pid in NEW_PRODUCT_IDS:
+        prices = book["products"][pid]["prices"]
+        choices = catalog[pid].slots["size"].choices
+        assert sorted(choices) == sorted(prices.keys()), pid
+
+
+def test_new_products_materials_and_coatings_match_pricebook():
+    catalog = load_catalog()
+    book = _pricebook()
+    for pid in NEW_PRODUCT_IDS:
+        entry = book["products"][pid]
+        materials = set(catalog[pid].slots["material"].choices)
+        for size_key, by_material in entry["prices"].items():
+            assert materials == set(by_material.keys()), f"{pid}/{size_key}"
+        addon_coatings = set(entry.get("addons", {}).get("coating", {}).keys())
+        coating = catalog[pid].slots.get("coating")
+        if coating is not None:
+            assert set(coating.choices) - {"none"} == addon_coatings, pid
+        else:  # 떡메모지: 코팅 슬롯도, addons 도 없어야 한다
+            assert addon_coatings == set(), pid
+
+
+def test_new_products_material_synonyms_within_choices():
+    """synonyms 값이 material.choices 안에 있어야 파서 제안이 검증을 통과한다."""
+    catalog = load_catalog()
+    assert catalog["postcard"].slots["material"].synonyms["랑데뷰"] == "rendezvous_240"
+    assert catalog["memopad"].slots["material"].synonyms["모조지"] == "woodfree_100"
+    assert catalog["photocard"].slots["material"].synonyms["펄지"] == "pearl_300"
+    for pid in NEW_PRODUCT_IDS:
+        mat = catalog[pid].slots["material"]
+        for word, target in mat.synonyms.items():
+            assert target in mat.choices, f"{pid}: '{word}'→{target} 가 choices 에 없음"
+
+
+def test_new_products_quick_options_are_valid_price_tiers():
+    catalog = load_catalog()
+    for pid in NEW_PRODUCT_IDS:
+        schema = catalog[pid]
+        base = {
+            "size": schema.slots["size"].choices[0],
+            "material": schema.slots["material"].choices[0],
+        }
+        if "sides" in schema.slots:
+            base["sides"] = "single"
+        if "coating" in schema.slots:
+            base["coating"] = "none"
+        for q in schema.slots["quantity"].quick_options:
+            result = quote(pid, {**base, "quantity": q})
+            assert result is not None and result.ok, f"{pid} qty={q}: {result and result.missing}"
+
+
+def test_quote_postcard_with_coating_addon():
+    result = quote(
+        "postcard",
+        {"size": "100x148", "material": "snow_250", "sides": "single",
+         "quantity": 500, "coating": "matte"},
+    )
+    assert isinstance(result, QuoteResult)
+    assert result.ok and result.missing == []
+    # 기본가 16,000 + 무광코팅 10,000 = 공급가 26,000 / VAT 2,600 / 합계 28,600
+    assert result.supply_amount == 26000
+    assert result.vat == 2600
+    assert result.total == 28600
+    assert [line.item for line in result.lines] == ["base", "coating:matte"]
+
+
+def test_quote_memopad_pad_units_no_coating():
+    """떡메모지는 권 단위·무코팅 — 내역은 기본가 1줄뿐."""
+    result = quote("memopad", {"size": "100x100", "material": "woodfree_100", "quantity": 5})
+    assert result is not None and result.ok
+    # 기본가 21,000 → VAT 2,100 → 23,100
+    assert result.total == 23100
+    assert len(result.lines) == 1 and result.lines[0].item == "base"
+
+
+def test_quote_photocard_double_sides_with_gloss():
+    result = quote(
+        "photocard",
+        {"size": "55x85", "material": "pearl_300", "sides": "double",
+         "quantity": 1000, "coating": "gloss"},
+    )
+    assert result is not None and result.ok
+    # 기본가 35,000 + 유광코팅 13,000 = 공급가 48,000 / VAT 4,800 / 합계 52,800
+    assert result.supply_amount == 48000
+    assert result.total == 52800
+    assert [line.item for line in result.lines] == ["base", "coating:gloss"]
+
+
+def test_quote_memopad_off_tier_quantity_missing():
+    """권 단위 수량도 구간 밖(3권)이면 보간하지 않고 missing."""
+    result = quote("memopad", {"size": "100x100", "material": "woodfree_100", "quantity": 3})
+    assert result is not None
+    assert result.missing == ["quantity=3"]
+    assert result.total == 0 and result.lines == []
+
+
+def test_quote_postcard_unknown_size_missing():
+    result = quote(
+        "postcard",
+        {"size": "70x70", "material": "snow_250", "sides": "single", "quantity": 100},
+    )
+    assert result is not None
+    assert result.missing == ["size=70x70"]
+    assert result.total == 0 and result.lines == []
+
+
+def test_quote_photocard_missing_sides_reported():
+    """포토카드는 sides 축이 있어 미지정 시 missing 으로 반환."""
+    result = quote(
+        "photocard", {"size": "55x85", "material": "art_300", "quantity": 100},
+    )
+    assert result is not None and not result.ok
+    assert result.missing == ["sides=(미지정)"]

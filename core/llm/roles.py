@@ -65,6 +65,9 @@ _PRODUCT_ALIASES: dict[str, tuple[str, ...]] = {
     "flyer": ("전단지", "전단", "리플렛", "리플릿", "찌라시"),
     "poster": ("포스터",),
     "label": ("라벨", "레이블"),
+    "postcard": ("엽서",),
+    "memopad": ("떡메모지", "메모지", "떡메모", "점착메모"),
+    "photocard": ("포토카드", "포카"),
 }
 
 #: B유형: 파일은 있으나 수정·보완이 필요하다는 표현
@@ -143,7 +146,7 @@ def _rule_classify(text: str, catalog: dict[str, ProductSchema]) -> ClassifyProp
 
 #: "90x90" 형태 사이즈 (x·X·×·* 허용)
 _SIZE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*[xX×*]\s*(\d+(?:\.\d+)?)")
-_QTY_UNITS = r"(?:매|장|개|부)"
+_QTY_UNITS = r"(?:매|장|개|부|권|롤|세트)"
 #: "천 장"→1000, "5천 장"→5000, "만 장"→10000, "3만 개"→30000
 _QTY_KOR_RE = re.compile(rf"(\d[\d,]*)?\s*(천|만)\s*{_QTY_UNITS}")
 #: "500매", "1,000장"
@@ -517,6 +520,11 @@ VALUE_LABELS: dict[str, str] = {
     "art_paper": "아트지 라벨",
     "yupo": "유포지(방수)",
     "clear_pet": "투명 PET",
+    # 용지 (엽서·떡메모지·포토카드) — art_250/art_300 은 위 스티커 항목과 공유
+    "rendezvous_240": "랑데뷰 240g",
+    "woodfree_100": "모조지 100g",
+    "woodfree_80": "모조지 80g",
+    "pearl_300": "펄지 300g",
     # 코팅
     "matte": "무광",
     "gloss": "유광",
@@ -863,7 +871,7 @@ _QUESTION_TEMPLATES: dict[str, str] = {
 }
 
 _GREETING = (
-    "안녕하세요! AI 인쇄 접수 도우미예요. 스티커·명함·전단·포스터·라벨 인쇄를 도와드리고 있어요.\n"
+    "안녕하세요! AI 인쇄 접수 도우미예요. 명함·스티커·전단·포스터·라벨·엽서·떡메모지·포토카드 인쇄를 도와드려요.\n"
     "어떤 상품이 필요하신지 말씀해 주시고, 인쇄할 PDF 파일이 있다면 지금 바로 올려주셔도 돼요."
 )
 
@@ -927,7 +935,7 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
             line += " " + ", ".join(_label(c) for c in sdef.choices) + " 중에서 골라주시면 돼요."
         return line
     if code.startswith("unknown_product:"):
-        return "말씀하신 상품은 아직 준비 중이에요. 지금은 스티커, 명함, 전단, 포스터, 라벨을 도와드릴 수 있어요."
+        return "말씀하신 상품은 아직 준비 중이에요. 지금은 명함, 스티커, 전단, 포스터, 라벨, 엽서, 떡메모지, 포토카드를 도와드릴 수 있어요."
     if code.startswith("quote_missing:"):
         axis, _, value = code.split(":", 1)[1].partition("=")
         display = _slot_display(axis, schema)
@@ -1103,7 +1111,7 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
         )
 
     if d.request_product:
-        parts.append("어떤 상품을 인쇄할까요? 스티커, 명함, 전단, 포스터, 라벨 중에 말씀해 주세요.")
+        parts.append("어떤 상품을 인쇄할까요? 명함, 스티커, 전단, 포스터, 라벨, 엽서, 떡메모지, 포토카드 중에 말씀해 주세요.")
     if d.request_file and not d.awaiting_confirm:
         parts.append("인쇄할 PDF 파일을 올려주시면 바로 검사해서 알려드릴게요.")
 

@@ -17,6 +17,7 @@ import pytest
 
 from synth.generate_clean import (
     BLEED_MM,
+    CORE_PRODUCTS,
     PRODUCTS,
     generate,
     has_cutcontour,
@@ -142,9 +143,9 @@ def test_corpus_composition(corpus):
         if "dieline" in e.defect_ids:
             assert e.product in ("sticker", "label")
 
-    # 정상은 5상품 × 2
+    # 정상은 기존 5상품(CORE_PRODUCTS) × 2 — PRODUCTS 에 신규 상품이 늘어도 코퍼스는 5종 고정
     clean_products = sorted(e.product for e in manifest.files if e.is_clean)
-    assert clean_products == sorted(list(PRODUCTS) * 2)
+    assert clean_products == sorted(list(CORE_PRODUCTS) * 2)
 
 
 def test_manifest_roundtrip(corpus):
