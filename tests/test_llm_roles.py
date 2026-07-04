@@ -175,20 +175,25 @@ def _bleed_fail() -> CheckResult:
     )
 
 
-def test_render_bleed_fail_includes_required_and_measured():
+def test_render_bleed_fail_summary_and_detail_in_translation():
+    """결과 우선: 챗은 한 줄 요약, 상세(기준·실측)는 카드가 쓰는 translate_check에 보존."""
+    from core.llm.roles import translate_check
+
     d = ReplyDirectives(
         kind="upload",
         report=PreflightReport(file="x.pdf", results=[_bleed_fail()]),
         offer_autofix=["bleed"],
     )
     reply = render_reply(d, _view(), STICKER, adapter=None)
-    assert "3mm" in reply          # 기준값
-    assert "0mm" in reply          # measured 실측값이 문장에 들어간다
-    assert "여백" in reply
-    assert "드릴까요" in reply      # autofix 제안
+    assert "검판 완료" in reply and "1건" in reply
+    assert "자동 보정" in reply
+    detail = translate_check(_bleed_fail())  # 상세 숫자는 카드용 번역에 그대로
+    assert "3mm" in detail and "0mm" in detail
 
 
-def test_render_resolution_fail_includes_dpi():
+def test_render_resolution_fail_detail_in_translation():
+    from core.llm.roles import translate_check
+
     r = CheckResult(
         check_id="resolution",
         status=CheckStatus.FAIL,
@@ -197,9 +202,9 @@ def test_render_resolution_fail_includes_dpi():
     )
     d = ReplyDirectives(kind="upload", report=PreflightReport(file="x.pdf", results=[r]))
     reply = render_reply(d, _view(), STICKER, adapter=None)
-    assert "96dpi" in reply
-    assert "300dpi" in reply
-    assert "흐릿" in reply
+    assert "검판 완료" in reply           # 챗은 요약
+    detail = translate_check(r)
+    assert "96dpi" in detail and "300dpi" in detail and "흐릿" in detail
 
 
 def test_translate_check_covers_all_12_checks_and_4_statuses():
@@ -247,15 +252,15 @@ def test_render_questions_with_quick_options():
     assert "골라" in reply
 
 
-def test_render_auto_filled_notification():
+def test_render_auto_filled_not_narrated():
+    """결과 우선: 자동 채운 값은 사이드 요약·슬롯에 있으니 챗에서 반복하지 않는다(간결)."""
     d = ReplyDirectives(kind="turn", auto_filled=[AutoFill(slot="material", value="art_250")])
     reply = render_reply(d, _view(), STICKER, adapter=None)
-    assert "아트지 250g" in reply
-    assert "기본 적용" in reply
-    assert "말씀해 주세요" in reply
+    assert "기본 적용" not in reply  # 수다스러운 통보 제거
+    assert len(reply) < 40           # 다른 지시가 없으면 아주 짧다
 
 
-def test_render_awaiting_confirm_summary():
+def test_render_awaiting_confirm_is_terse():
     view = _view(
         state="PROOF_CONFIRM",
         slots={
@@ -266,9 +271,27 @@ def test_render_awaiting_confirm_summary():
     )
     d = ReplyDirectives(kind="turn", awaiting_confirm=True)
     reply = render_reply(d, view, STICKER, adapter=None)
-    assert "이대로 진행할까요?" in reply
-    assert "90x90" in reply
-    assert "500매" in reply
+    assert "이대로 진행할까요?" in reply       # 사양 요약은 카드·사이드패널이 담당
+
+
+def test_render_awaiting_confirm_with_changes():
+    """변경이 있었으면 '검토 결과 반영한 최종본' 프레이밍."""
+    d = ReplyDirectives(
+        kind="turn",
+        awaiting_confirm=True,
+        changes=[{"label": "재단 여백 자동 연장", "before": "0mm", "after": "3mm"}],
+    )
+    reply = render_reply(d, _view(state="PROOF_CONFIRM"), STICKER, adapter=None)
+    assert "최종본" in reply and "진행할까요?" in reply
+
+
+def test_render_estimate_quote_prefix():
+    from core.quote.engine import QuoteResult
+
+    q = QuoteResult(product="sticker", total=24200, supply_amount=22000, vat=2200)
+    d = ReplyDirectives(kind="turn", quote=q, estimate=True)
+    reply = render_reply(d, _view(), STICKER, adapter=None)
+    assert "예상 견적" in reply and "24,200원" in reply
 
 
 def test_render_conflict_question():

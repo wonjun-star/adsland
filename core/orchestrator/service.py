@@ -112,6 +112,9 @@ class ReplyDirectives(BaseModel):
     design_template_name: str = ""           # 적용된 템플릿 표시명
     request_card_fields: bool = False        # 이름/회사 등 명함 내용이 더 필요
     offer_design: bool = False               # 파일 없는 명함 고객에게 시안 생성 제안
+    # 결과 우선 — 예상 견적 + 변경 이력 (검판원·발주·고객 공용)
+    estimate: bool = False                   # quote가 확정이 아니라 예상 견적
+    changes: list[dict] = Field(default_factory=list)  # 접수본→최종본 변경 항목
 
 
 class TurnResult(BaseModel):
@@ -388,9 +391,12 @@ class IntakeService:
 
         row = self._get(session_id)
         quote_result = self._quote(row)
-        d = ReplyDirectives(kind="confirm", order_no=order_no, quote=quote_result)
+        changes = self._build_changes(session_id)
+        final_preview = self._render_preview_png(Path(row.file_path), session_id) if row.file_path else None
+        d = ReplyDirectives(kind="confirm", order_no=order_no, quote=quote_result, changes=changes)
         cards = [
             {
+                # 발주·생산 인계 명세 — 무엇을 받는지 명확히
                 "type": "order_confirmed",
                 "order_no": order_no,
                 "summary": {
@@ -398,8 +404,21 @@ class IntakeService:
                     "slots": {k: v.get("value") for k, v in (row.slots or {}).items()},
                     "total": quote_result.total if quote_result else None,
                 },
+                "final_preview": final_preview,        # 최종 확정본 미리보기 (발주 인계)
+                "changes": changes,                    # 접수본 대비 변경 내역
+                "file_name": Path(row.file_path).name if row.file_path else None,
             }
         ]
+        if changes:
+            cards.append(
+                {
+                    "type": "change_summary",
+                    "product": row.product,
+                    "items": changes,
+                    "original_preview": changes[0].get("before_preview"),
+                    "final_preview": changes[-1].get("after_preview"),
+                }
+            )
         return TurnResult(session=self._view(row), directives=d, cards=cards)
 
     def view_session(self, session_id: str) -> SessionView:
@@ -521,6 +540,56 @@ class IntakeService:
         values = {k: v.get("value") for k, v in (row.slots or {}).items() if v.get("value") is not None}
         return quote(row.product, values)
 
+    def _estimate_quote(self, row: OrderSession, schema: ProductSchema) -> QuoteResult | None:
+        """확정 견적이 아직 안 될 때 '예상 견적'. 수량만 있으면 나머지 필수값을
+        기본값(없으면 첫 선택지)으로 채워 예상가를 낸다 — 고객이 바로 가격 감을 잡게."""
+        if not row.product:
+            return None
+        slots = row.slots or {}
+        values = {k: v.get("value") for k, v in slots.items() if v.get("value") is not None}
+        if values.get("quantity") is None:
+            return None  # 수량 없이는 가격을 낼 수 없다
+        for name, sd in schema.required_slots().items():
+            if values.get(name) is None:
+                if sd.has_default:
+                    values[name] = sd.default
+                elif sd.choices:
+                    values[name] = str(sd.choices[0])
+                else:
+                    return None
+        q = quote(row.product, values)
+        if q is None or q.missing:
+            return None
+        return q
+
+    def _build_changes(self, session_id: str) -> list[dict]:
+        """이벤트 로그에서 '접수본 → 최종본' 변경 항목을 뽑는다 (검판원·고객 공용).
+
+        지금은 자동 보정(autofix)이 유일한 변경원 — 파일이 이렇게 들어와 이렇게 바뀌었다를
+        전/후 미리보기와 함께 기록한다. 본개발에서 색공간 변환 등으로 확장.
+        """
+        changes: list[dict] = []
+        for e in self.store.events(session_id):
+            if e.type != "autofix_applied":
+                continue
+            p = e.payload or {}
+            previews = p.get("previews") or [{}]
+            pv = previews[0] if previews else {}
+            cid = p.get("check_id")
+            label = "재단 여백 자동 연장" if cid == "bleed" else f"자동 보정({cid})"
+            changes.append(
+                {
+                    "kind": "autofix",
+                    "check_id": cid,
+                    "label": label,
+                    "before": "재단 여백 없음(0mm)" if cid == "bleed" else "보정 전",
+                    "after": f"사방 {round(float(p.get('bleed_mm', 3)))}mm 확보" if cid == "bleed" else "보정 후",
+                    "before_preview": pv.get("before"),
+                    "after_preview": pv.get("after"),
+                }
+            )
+        return changes
+
     def _advance(
         self,
         session_id: str,
@@ -578,8 +647,19 @@ class IntakeService:
                 )
                 if quote_result.missing:
                     d.notices.extend(f"quote_missing:{m}" for m in quote_result.missing)
+                    quote_result = None  # 조회 실패한 견적은 표시하지 않는다
                 else:
                     d.quote = quote_result
+
+        # 확정 견적이 아직 없으면 '예상 견적'이라도 보여준다 (결과 우선 — 가격 먼저)
+        if d.quote is None:
+            est = self._estimate_quote(row, schema)
+            if est is not None:
+                d.quote = est
+                d.estimate = True
+
+        # 변경 이력 (접수본 → 최종본) — 자동 보정 등이 적용됐으면 채워진다
+        d.changes = self._build_changes(session_id)
 
         # 에스컬레이션 시그널
         change_counts = {k: v.get("change_count", 0) for k, v in (row.slots or {}).items()}
@@ -640,15 +720,32 @@ class IntakeService:
         """directives → UI 카드 목록 (docs/API.md 계약)."""
         cards: list[dict] = []
         if d.report is not None and d.kind in ("upload", "autofix"):
+            from core.llm.roles import translate_check  # 항목별 고객 언어 설명(카드용)
+
+            results = []
+            for r in d.report.results:
+                rd = r.model_dump(mode="json")
+                rd["message"] = translate_check(r)  # 상세 설명은 카드에 (챗은 결과 요약만)
+                results.append(rd)
             cards.append(
                 {
                     "type": "preflight_report",
-                    "results": [r.model_dump(mode="json") for r in d.report.results],
+                    "results": results,
                     "gate_ok": d.report.gate_ok,
                 }
             )
         if d.quote is not None and not d.quote.missing:
-            cards.append({"type": "quote", **d.quote.model_dump(mode="json")})
+            cards.append({"type": "quote", "estimate": d.estimate, **d.quote.model_dump(mode="json")})
+        if d.changes:
+            cards.append(
+                {
+                    "type": "change_summary",
+                    "product": row.product,
+                    "items": d.changes,
+                    "original_preview": d.changes[0].get("before_preview"),
+                    "final_preview": d.changes[-1].get("after_preview"),
+                }
+            )
         if d.escalation_reasons:
             cards.append({"type": "escalation", "reasons": d.escalation_reasons})
         if d.order_no:

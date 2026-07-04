@@ -1012,109 +1012,106 @@ def _summary_line(view: "SessionView", schema: ProductSchema | None) -> str:
     return f"주문 내용을 정리해볼게요 — {product_name}: " + " / ".join(items) + "."
 
 
-def _render_report(report: Any, offer_autofix: set[str]) -> list[str]:
+def _report_summary_line(report: Any, offer_autofix: set[str]) -> str:
+    """검판 결과를 '한 줄'로 — 항목별 상세는 검판 카드가 보여준다 (결과 우선)."""
     problems = [r for r in report.results if str(r.status) != "pass"]
     if not problems:
-        return ["파일 검사 결과, 모든 항목을 통과했어요. 인쇄 진행에 문제가 없어요."]
-    lines = ["파일을 검사해봤어요. 몇 가지 알려드릴 게 있어요."]
-    for r in problems:
-        line = translate_check(r)
-        if r.check_id in offer_autofix and "드릴까요" not in line:
-            line += " 자동 보정이 가능한 항목이에요 — 원하시면 바로 고쳐드릴게요."
-        lines.append("- " + line)
-    return lines
+        return "검판 통과 — 모든 항목 이상 없어요."
+    n = len(problems)
+    line = f"검판 완료 — {n}건 확인이 필요해요."
+    if offer_autofix:
+        line += " 여백은 바로 자동 보정할 수 있어요."
+    return line
+
+
+def _changes_line(changes: list) -> str:
+    """변경 이력을 '한 줄'로 (접수본 → 최종본)."""
+    labels = []
+    for c in changes:
+        before, after = c.get("before"), c.get("after")
+        if before and after:
+            labels.append(f"{c.get('label')}({before} → {after})")
+        else:
+            labels.append(c.get("label", "보정"))
+    return "적용한 변경: " + ", ".join(labels) + "."
 
 
 def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchema | None) -> str:
-    """친절한 인쇄사 상담원 톤의 존댓말 템플릿 — 데모의 얼굴."""
+    """결과 우선·최소 대화 템플릿 — 상세는 카드가, 말은 짧게.
+
+    원칙: 결과(검판·견적·변경·최종본)를 먼저 한 줄로 알리고, 꼭 필요한 질문만 남긴다.
+    항목별 상세·내역은 카드가 보여주므로 문장에서 반복하지 않는다.
+    """
     if d.kind == "greeting":
         return _GREETING
 
+    # 발주 완료 — 간결 + 변경 요약 (생산 인계본이 무엇인지)
     if d.order_no:
-        parts = [f"주문이 확정됐어요! 주문번호는 {d.order_no}예요."]
+        parts = [f"주문 확정 · {d.order_no}"]
         if d.quote is not None and not d.quote.missing:
-            parts.append(_quote_line(d.quote, schema))
-        parts.append("접수해 주신 내용 그대로 인쇄 준비에 들어갈게요. 이용해 주셔서 감사합니다!")
-        return "\n".join(parts)
+            parts.append(f"결제 금액 {_won(d.quote.total)} (부가세 포함).")
+        if d.changes:
+            parts.append(_changes_line(d.changes))
+        parts.append("최종 확정본으로 인쇄 들어갑니다.")
+        return " ".join(parts)
 
     parts: list[str] = []
 
+    # 시안 경로 (간결)
     if d.request_card_fields:
-        parts.append(
-            "명함 시안을 만들어드릴게요. 이름과 회사명을 알려주시면 시작할 수 있어요. "
-            "직위·연락처·이메일도 함께 주시면 바로 반영할게요."
-        )
-
+        parts.append("명함 시안을 만들어드릴게요. 이름과 회사명만 주시면 바로 시작해요.")
     if d.design_generated:
-        tmpl = f"'{d.design_template_name}' 스타일" if d.design_template_name else "기본 스타일"
-        parts.append(
-            f"주신 정보로 {tmpl} 명함 시안을 만들어봤어요. 아래 미리보기를 확인해 주세요. "
-            "모던·클래식·미니멀 스타일 중에서 바꿔볼 수 있어요."
-        )
-
+        tmpl = f"'{d.design_template_name}' " if d.design_template_name else ""
+        parts.append(f"{tmpl}명함 시안을 만들었어요. 아래에서 확인하고 스타일을 바꿔볼 수 있어요.")
     if d.offer_design and not d.design_generated:
-        parts.append(
-            "완성된 파일이 있으면 올려주셔도 되고, 없으시면 명함에 넣을 정보(이름·회사·직위·연락처)를 "
-            "알려주시면 시안을 바로 만들어드려요."
-        )
+        parts.append("파일이 있으면 올려주시고, 없으시면 이름·회사·직위·연락처를 주시면 시안을 만들어드려요.")
 
-    if d.kind == "upload":
-        parts.append("파일 잘 받았어요.")
-    elif d.kind == "autofix":
-        parts.append("요청하신 자동 보정을 적용하고 다시 검사했어요.")
+    # 검판 결과 — 한 줄 (상세는 카드)
+    if d.report is not None and d.kind in ("upload", "autofix"):
+        parts.append(_report_summary_line(d.report, set(d.offer_autofix)))
+    # 변경 이력 — 보정 직후 한 줄
+    if d.changes and d.kind == "autofix":
+        parts.append(_changes_line(d.changes))
 
+    # 예상/확정 견적 — 한 줄 (항상 가격 먼저)
+    if d.quote is not None and not d.quote.missing:
+        prefix = "예상 견적" if d.estimate else "견적"
+        parts.append(f"{prefix} {_won(d.quote.total)} (부가세 포함).")
+
+    # 안내 코드 (무효값·가격표 밖 수량 등)
     for code in d.notices:
         line = _notice_line(code, schema)
         if line:
             parts.append(line)
 
-    # 리포트 상세 번역은 업로드/보정 직후에만 (매 턴 반복 방지 — cards 정책과 동일)
-    if d.report is not None and d.kind in ("upload", "autofix"):
-        parts.extend(_render_report(d.report, set(d.offer_autofix)))
-
+    # 충돌 확인 (간결)
     for c in d.conflicts:
         display = c.display_name or _slot_display(c.slot, schema)
         inferred, user = _label(c.inferred_value), _label(c.user_value)
-        parts.append(
-            f"{display} 확인이 필요해요 — 파일은 {inferred}인데 {user}{_ro(user)} 말씀하셨어요. "
-            "어느 쪽으로 할까요?"
-        )
+        parts.append(f"{display} — 파일은 {inferred}, 말씀은 {user}. 어느 쪽으로 할까요?")
 
-    if d.auto_filled:
-        filled = ", ".join(
-            f"{_slot_display(af.slot, schema)}{_eun(_slot_display(af.slot, schema))} "
-            f"{_label(af.value)}{_ro(_label(af.value))}"
-            for af in d.auto_filled
-        )
-        parts.append(f"{filled} 기본 적용해뒀어요. 다른 걸 원하시면 언제든 말씀해 주세요.")
+    # 남은 질문만 (자동 채운 값은 사이드 요약에 있으니 문장에서 반복하지 않음)
+    for q in d.questions:
+        parts.append(_question_line(q, schema))
 
-    if d.questions:
-        if len(d.questions) > 1:
-            parts.append("몇 가지만 여쭤볼게요.")
-        for q in d.questions:
-            parts.append(_question_line(q, schema))
-
-    if d.quote is not None and not d.quote.missing:
-        parts.append(_quote_line(d.quote, schema))
-
+    # 확정 단계 — 검토 → 최종본 → 진행
     if d.awaiting_confirm:
-        parts.append(_summary_line(view, schema) + " 이대로 진행할까요?")
+        if d.changes:
+            parts.append("검토 결과를 반영한 최종본이에요. 이대로 진행할까요?")
+        else:
+            parts.append("검판 통과했어요. 이대로 진행할까요?")
 
     if d.gate_blockers:
-        parts.append("주문 확정 전에 해결할 것이 남아 있어요.")
-        parts.extend("- " + _blocker_line(b) for b in d.gate_blockers)
+        parts.append("확정 전에 남은 항목: " + ", ".join(_blocker_line(b) for b in d.gate_blockers))
 
     if d.escalation_reasons:
-        parts.append(
-            "확인이 필요한 부분이 있어서 담당자 검토 큐로 넘겼어요. "
-            "담당자가 살펴본 뒤 이어서 안내드릴게요."
-        )
+        parts.append("확인이 필요한 부분이 있어 담당자 검토로 넘겼어요.")
 
     if d.request_product:
-        parts.append("어떤 상품을 인쇄할까요? 명함, 스티커, 전단, 포스터, 라벨, 엽서, 떡메모지, 포토카드 중에 말씀해 주세요.")
-    if d.request_file and not d.awaiting_confirm:
-        parts.append("인쇄할 PDF 파일을 올려주시면 바로 검사해서 알려드릴게요.")
+        parts.append("어떤 상품인가요? 명함·스티커·전단·포스터·라벨·엽서·떡메모지·포토카드.")
+    if d.request_file and not d.awaiting_confirm and not d.offer_design:
+        parts.append("PDF 파일을 올려주시면 바로 검판해드려요.")
 
     if not parts:
-        parts.append("네, 확인했어요. 이어서 진행할게요.")
+        parts.append("확인했어요.")
     return "\n".join(parts)
