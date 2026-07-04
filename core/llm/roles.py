@@ -21,7 +21,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from core.design.schema import CardContent
+from core.design.romanize import TITLE_EN, romanize_name
+from core.design.schema import ACCENT_COLORS, CardContent
 from core.llm.adapter import LLMAdapter
 from core.llm.parsing import (
     ClassifyProposal,
@@ -330,9 +331,35 @@ _PHONE_MOBILE_RE = re.compile(r"01[016789][\s\-.]?\d{3,4}[\s\-.]?\d{4}")
 _PHONE_TEL_RE = re.compile(r"0\d{1,2}[\s\-.]?\d{3,4}[\s\-.]?\d{4}")
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 _COMPANY_RE = re.compile(r"(?:[\w가-힣&.\- ]{1,20}\s*(?:주식회사|\(주\)|㈜))|(?:(?:주식회사|\(주\)|㈜)\s*[\w가-힣&.\-]{1,20})")
-#: 값 뒤에 붙는 지시·잡문 절단 ("수석 연구원 이렇게 넣어서 만들어줘" → "수석 연구원")
+#: 값 뒤에 붙는 지시·잡문 절단 ("수석 연구원 이렇게 넣어서 만들어줘" → "수석 연구원").
+#: 디자인 지시(색상·영어·로고 등)도 여기서 잘라 값이 문장 끝까지 새는 것을 막는다.
 _VALUE_STOP_RE = re.compile(
-    r"\s*(?:이렇게|이대로|요렇게|위\s*내용|넣어서?|들어가게|들어간|으로\s*(?:만들|해|부탁)|로\s*(?:만들|해|부탁)|만들|제작|부탁|해\s?주|해\s?줘|주세요|할게|입니다|이에요|예요|이고|이며).*$"
+    r"\s*(?:이렇게|이대로|요렇게|위\s*내용|넣어서?|들어가게|들어간"
+    r"|색상|색깔|색으로|색\b|영어|영문|로고|폰트|글씨|글자|병기|스타일"
+    r"|파란|파랑|블루|남색|네이비|빨간|빨강|레드|초록|녹색|그린|검정|검은|블랙|회색|그레이|주황|보라|청록|민트"
+    r"|으로\s*(?:만들|해|부탁)|로\s*(?:만들|해|부탁)|만들|제작|부탁|해\s?주|해\s?줘|주세요|할게|입니다|이에요|예요|이고|이며"
+    r"|\s내\s).*$"
+)
+
+#: 포인트 색상 표현 → ACCENT_COLORS 키 (먼저 나온 것 우선, 긴 표현부터)
+_COLOR_PATTERNS: list[tuple[str, str]] = [
+    ("navy", r"남색|네이비"),
+    ("blue", r"파란|파랑|블루|하늘색"),
+    ("red", r"빨간|빨강|레드"),
+    ("green", r"초록|녹색|그린"),
+    ("black", r"검정|검은|블랙"),
+    ("gray", r"회색|그레이"),
+    ("orange", r"주황|오렌지"),
+    ("purple", r"보라|퍼플"),
+    ("teal", r"청록|민트|틸색"),
+]
+_BILINGUAL_RE = re.compile(r"영어|영문|english|bilingual", re.IGNORECASE)
+#: 회사명 라벨 없이 앞에 오는 경우를 위해 제거할 앞머리 단어 (지시·사양·색상 포함)
+_LEAD_NOISE_RE = re.compile(
+    r"명함|만들어\s?줘|만들어|만들|제작|시안|디자인|해\s?줘|해\s?주|좀|주세요|하고\s?싶|싶어|싶은데|주문|하려|할래|할게"
+    r"|양면(?:으로)?|단면(?:으로)?|앞뒤|앞뒷면|양쪽|한\s?면"
+    r"|색상|색깔|파란(?:색)?|파랑|블루|남색|네이비|빨간(?:색)?|빨강|레드|초록|녹색|그린|검정|검은|블랙|회색|그레이|주황|보라"
+    r"|영어로?도?|영문|로고|폰트"
 )
 
 #: 템플릿 선택 표현 → 템플릿 id
@@ -352,6 +379,19 @@ def extract_template(text: str) -> str | None:
     for word, tmpl in _TEMPLATE_WORDS.items():
         if word in text:
             return tmpl
+    return None
+
+
+_SIDES_DOUBLE_RE = re.compile(r"양면|앞뒤|앞뒷면|뒷면|양쪽|뒤에도|뒤도")
+_SIDES_SINGLE_RE = re.compile(r"단면|한\s?면|앞면만|한쪽")
+
+
+def extract_sides(text: str) -> str | None:
+    """발화에서 인쇄면(단면/양면) 추출. 시안 재생성 라우팅용."""
+    if _SIDES_DOUBLE_RE.search(text):
+        return "double"
+    if _SIDES_SINGLE_RE.search(text):
+        return "single"
     return None
 
 
@@ -427,7 +467,33 @@ def _rule_card_content(text: str) -> CardContent:
         if m:
             data["company"] = _clean_value(m.group(0))
 
-    return CardContent(**data)
+    # 3) 라벨 없는 회사명: 첫 라벨 앞머리에서 지시어를 걷어낸 나머지
+    if "company" not in data:
+        head_end = filtered[0][0] if filtered else 0
+        head = text[:head_end] if head_end else ""
+        head = _LEAD_NOISE_RE.sub(" ", head)
+        cand = _clean_value(head)
+        # 숫자·기호 없이 2~12자면 회사명 후보로 인정
+        if cand and 2 <= len(cand) <= 12 and not any(c.isdigit() for c in cand):
+            data["company"] = cand
+
+    # 4) 디자인 옵션: 색상 + 영어 병기
+    for key, pat in _COLOR_PATTERNS:
+        if re.search(pat, text):
+            data["accent_color"] = key
+            break
+    if _BILINGUAL_RE.search(text):
+        data["bilingual"] = True
+
+    content = CardContent(**data)
+
+    # 5) 영어 병기 요청 시 규칙 기반으로 영문 필드를 채운다 (API 없이도 최소 동작)
+    if content.bilingual:
+        if content.name and not content.name_en:
+            content.name_en = romanize_name(content.name)
+        if content.title and not content.title_en:
+            content.title_en = TITLE_EN.get(content.title.replace(" ", ""), TITLE_EN.get(content.title, ""))
+    return content
 
 
 # ================================================================ 3) 대화 생성기

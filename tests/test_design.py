@@ -58,6 +58,38 @@ def test_parse_card_content_ignores_spec_talk():
     assert not parse_card_content("회사 이름을 크게 해주세요", None).is_generatable()
 
 
+def test_parse_freeform_color_bilingual_and_bare_company():
+    """라벨 없는 자유형 발화: 값 잘림·회사 감지·색상·영어 병기."""
+    c = parse_card_content(
+        "명함 만들어줘 피플즈리그 이름은 황원준 직책 수석연구원 "
+        "색상은 파란색 영어로도 있음 좋겠고 내 번호는 01046574801",
+        None,
+    )
+    assert c.name == "황원준"
+    assert c.title == "수석연구원"          # 지시문이 값에 새지 않는다
+    assert c.company == "피플즈리그"        # 라벨 없는 회사명 감지
+    assert c.phone == "01046574801"
+    assert c.accent_color == "blue"
+    assert c.bilingual is True
+    assert c.name_en == "Hwang Wonjun"     # 규칙 기반 로마자 (API 없이)
+    assert c.title_en == "Senior Researcher"
+
+
+@pytest.mark.parametrize("template", list(TEMPLATES))
+def test_colored_bilingual_card_passes_preflight(tmp_path, template):
+    from core.preflight.report import CheckStatus
+
+    content = CardContent(
+        name="황원준", title="수석연구원", company="피플즈리그",
+        phone="01046574801", accent_color="blue", bilingual=True,
+        name_en="Hwang Wonjun", title_en="Senior Researcher",
+    )
+    out = tmp_path / f"blue_{template}.pdf"
+    generate_namecard(content, out, template=template)
+    report = run_preflight(out, OrderContext(product="namecard", size_mm=(90, 50), page_count=1))
+    assert report.gate_ok, [r.check_id for r in report.results if r.status != CheckStatus.PASS]
+
+
 def test_extract_template():
     assert extract_template("클래식으로 바꿔줘") == "classic"
     assert extract_template("미니멀하게 해주세요") == "minimal"
@@ -96,6 +128,22 @@ def test_design_flow_full_journey(chat):
 
     r, reply = chat.process_message(sid, "네 진행할게요")
     assert r.session.state == "COMPLETED"
+
+
+def test_double_sided_generates_back(chat):
+    """양면 요청 → 앞뒤 2페이지 생성, page_count·sides 정합, 검판 통과."""
+    r, _ = chat.start()
+    sid = r.session.id
+    r, _ = chat.process_message(
+        sid, "명함 양면으로 만들어줘 피플즈리그 이름은 황원준 번호는 01046574801"
+    )
+    assert r.session.slots["sides"]["value"] == "double"
+    assert r.directives.report.gate_ok
+    pc = r.directives.report.by_id("page_count")
+    assert pc.measured["file_pages"] == 2
+    # 뒷면에 회사명이 사양 단어 없이 들어간다
+    dp = next(c for c in r.cards if c["type"] == "design_preview")
+    assert dp["fields"]["company"] == "피플즈리그"
 
 
 def test_design_template_switch(chat):

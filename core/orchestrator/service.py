@@ -262,6 +262,7 @@ class IntakeService:
         session_id: str,
         content: CardContent,
         template: str | None = None,
+        sides: str | None = None,
     ) -> TurnResult:
         """명함 시안 경로: 내용 필드를 누적하고, 충분하면 인쇄용 시안을 생성한다.
 
@@ -293,6 +294,9 @@ class IntakeService:
         if tmpl not in TEMPLATES:
             tmpl = DEFAULT_TEMPLATE
         self.store.set_design(session_id, merged.model_dump(), tmpl)
+        # 인쇄면 지정이 들어오면 슬롯에 반영 → 생성 시 앞/뒤 페이지 수가 맞춰진다
+        if sides in ("single", "double"):
+            self.store.set_slot(session_id, "sides", sides, source="user")
 
         # 이름·회사 중 하나도 없으면 아직 못 만든다 → 내용 요청
         if not merged.is_generatable():
@@ -311,10 +315,14 @@ class IntakeService:
 
     def _generate_design(self, session_id: str, content: CardContent, template: str) -> dict:
         """명함 PDF 생성 → 파일 등록 → FILE_CHECK 왕복으로 검판."""
+        row = self._get(session_id)
+        # 인쇄면 슬롯이 양면이면 뒷면까지 2페이지로 생성 (page_count·견적이 자동으로 맞춰짐)
+        sides = (row.slots or {}).get("sides", {}).get("value")
+        double_sided = sides == "double"
         out_dir = UPLOAD_DIR / session_id
         out_dir.mkdir(parents=True, exist_ok=True)
         out = out_dir / "design_namecard.pdf"
-        info = generate_namecard(content, out, template=template)
+        info = generate_namecard(content, out, template=template, double_sided=double_sided)
         self.store.set_file_path(session_id, str(out))
         self.store.record_event(session_id, "design_generated", info)
 

@@ -118,25 +118,30 @@ class ChatPipeline:
             rule=lambda: roles.parse_card_content(text, None),
         )
         template = roles.extract_template(text)
+        sides = roles.extract_sides(text)  # 양면/단면 → 뒷면 생성 여부
 
         if view.design_mode:
-            # 이미 시안 모드: 내용 추가·수정 또는 템플릿 변경일 때만 재생성.
+            # 이미 시안 모드: 내용 추가·수정, 템플릿 변경, 인쇄면 변경일 때만 재생성.
             # 수량·확정 같은 메시지는 일반 흐름(슬롯 파싱)으로 흘려보낸다.
-            if not content.filled_fields() and not template:
+            if not content.filled_fields() and not template and not sides:
                 return None
         elif not (design_ask or content.is_generatable()):
             # 시안 모드 진입 조건: 시안 제작 요청(C) 또는 생성 가능한 내용
             return None
 
-        result = self.service.handle_card_content(session_id, content, template=template)
+        result = self.service.handle_card_content(session_id, content, template=template, sides=sides)
         return result, self._render(result, adapter)
 
     def process_design(
-        self, session_id: str, template: str | None = None, fields: dict | None = None
+        self,
+        session_id: str,
+        template: str | None = None,
+        fields: dict | None = None,
+        sides: str | None = None,
     ) -> tuple[TurnResult, str]:
-        """UI에서 템플릿 변경·내용 수정 버튼 → 시안 재생성."""
+        """UI에서 템플릿 변경·내용 수정·인쇄면 변경 → 시안 재생성."""
         content = CardContent(**(fields or {}))
-        result = self.service.handle_card_content(session_id, content, template=template)
+        result = self.service.handle_card_content(session_id, content, template=template, sides=sides)
         return result, self._render(result, self.adapter_provider())
 
     def process_upload(

@@ -23,6 +23,27 @@ TEMPLATES: dict[str, str] = {
 DEFAULT_TEMPLATE = "modern"
 
 
+#: 포인트 색상 이름 → DeviceCMYK 성분 (c, m, y, k). 명함 디자인 강조색.
+ACCENT_COLORS: dict[str, tuple[float, float, float, float]] = {
+    "teal": (0.82, 0.42, 0.30, 0.10),    # 기본 (청록)
+    "blue": (0.85, 0.55, 0.0, 0.0),      # 파랑
+    "navy": (1.0, 0.75, 0.20, 0.35),     # 남색
+    "red": (0.10, 0.90, 0.75, 0.0),      # 빨강
+    "green": (0.75, 0.15, 0.90, 0.0),    # 초록
+    "black": (0.0, 0.0, 0.0, 1.0),       # 검정
+    "gray": (0.0, 0.0, 0.0, 0.55),       # 회색
+    "orange": (0.0, 0.55, 0.95, 0.0),    # 주황
+    "purple": (0.60, 0.75, 0.0, 0.10),   # 보라
+}
+DEFAULT_ACCENT = "teal"
+
+#: 색상 이름 한국어 표시
+ACCENT_LABELS: dict[str, str] = {
+    "teal": "청록", "blue": "파랑", "navy": "남색", "red": "빨강",
+    "green": "초록", "black": "검정", "gray": "회색", "orange": "주황", "purple": "보라",
+}
+
+
 class CardContent(BaseModel):
     """명함에 인쇄할 내용. name만 있으면 생성 가능(나머지는 있으면 배치)."""
 
@@ -35,18 +56,38 @@ class CardContent(BaseModel):
     email: str = ""
     address: str = ""
     tagline: str = ""         # 슬로건 (선택)
+    # 디자인 옵션
+    accent_color: str = ""    # ACCENT_COLORS 키 (빈 값이면 기본 teal)
+    bilingual: bool = False   # 영어 병기 요청
+    name_en: str = ""         # 영문 이름 (병기 시)
+    company_en: str = ""      # 영문 회사명
+    title_en: str = ""        # 영문 직위
 
     def is_generatable(self) -> bool:
         return bool(self.name.strip() or self.company.strip())
 
     def filled_fields(self) -> list[str]:
-        return [k for k, v in self.model_dump().items() if str(v).strip()]
+        """실제로 채워진 필드. 불리언 False는 '채워짐'이 아니다 (라우팅 오판 방지)."""
+        out = []
+        for k, v in self.model_dump().items():
+            if isinstance(v, bool):
+                if v:
+                    out.append(k)
+            elif str(v).strip():
+                out.append(k)
+        return out
 
     def merged_with(self, other: "CardContent") -> "CardContent":
-        """other의 비어있지 않은 필드로 덮어쓴 새 CardContent (턴마다 누적 입력)."""
+        """other의 비어있지 않은 필드로 덮어쓴 새 CardContent (턴마다 누적 입력).
+
+        불리언(bilingual)은 한 번 켜지면 유지한다(OR). 문자열은 새 값이 있을 때만 덮는다.
+        """
         data = self.model_dump()
         for k, v in other.model_dump().items():
-            if str(v).strip():
+            if isinstance(v, bool):
+                if v:
+                    data[k] = True
+            elif str(v).strip():
                 data[k] = v
         return CardContent(**data)
 
