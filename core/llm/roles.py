@@ -961,6 +961,8 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
         return "그 항목은 자동 보정을 지원하지 않아요. 파일을 수정해 다시 올려주시거나 담당자 확인이 필요해요."
     if code == "autofix_no_file":
         return "보정할 파일이 아직 없어요. 먼저 PDF 파일을 올려주세요."
+    if code == "need_back_side_file":
+        return "양면으로 진행하려면 뒷면 파일도 올려주세요. (지금은 앞면 1장만 받았어요)"
     return None  # quote_missing 등 내부 코드는 질문/에스컬레이션이 따로 안내한다
 
 
@@ -1057,6 +1059,11 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
 
     parts: list[str] = []
 
+    # 파일을 보고 상품을 추정했으면 '제안'으로 먼저 말한다 (틀리면 고객이 바로잡음)
+    if getattr(d, "detected_product", ""):
+        p = d.detected_product
+        parts.append(f"올려주신 파일, {p} 만드시려는 것 같아요. {p}{_ro(p)} 진행할게요 — 다른 상품이면 알려주세요.")
+
     # 시안 경로 (간결)
     if d.request_card_fields:
         parts.append("명함 시안을 만들어드릴게요. 이름과 회사명만 주시면 바로 시작해요.")
@@ -1092,7 +1099,10 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
 
     # 남은 질문만 (자동 채운 값은 사이드 요약에 있으니 문장에서 반복하지 않음)
     for q in d.questions:
-        parts.append(_question_line(q, schema))
+        if q.slot == "sides" and getattr(d, "offer_back_side", False):
+            parts.append("앞면 확인했어요 — 단면으로 할까요, 양면으로 할까요? 양면이면 뒷면 파일도 올려주세요.")
+        else:
+            parts.append(_question_line(q, schema))
 
     # 확정 단계 — 검토 → 최종본 → 진행
     if d.awaiting_confirm:

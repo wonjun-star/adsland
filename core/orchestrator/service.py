@@ -115,6 +115,8 @@ class ReplyDirectives(BaseModel):
     # 결과 우선 — 예상 견적 + 변경 이력 (검판원·발주·고객 공용)
     estimate: bool = False                   # quote가 확정이 아니라 예상 견적
     changes: list[dict] = Field(default_factory=list)  # 접수본→최종본 변경 항목
+    detected_product: str = ""               # 파일 규격으로 상품을 알아챘을 때 표시명
+    offer_back_side: bool = False            # 앞면만 올린 명함류 → 뒷면(양면) 확인
 
 
 class TurnResult(BaseModel):
@@ -157,7 +159,12 @@ class IntakeService:
         if classify is not None:
             if classify.product and classify.product in self.catalog:
                 if row.product != classify.product:
-                    row = self.store.set_product(session_id, classify.product)
+                    # 상품이 바뀌면(추정이 틀려 고객이 바로잡는 경우 포함) 사양 초기화 + 재검판
+                    had_product = row.product is not None
+                    self.store.set_product(session_id, classify.product)
+                    if had_product:
+                        self._reclassify_reset(session_id)
+                    row = self._get(session_id)
             elif classify.product:
                 notices.append(f"unknown_product:{classify.product}")
             if classify.customer_type and row.customer_type != classify.customer_type.value:
@@ -211,6 +218,18 @@ class IntakeService:
             self.store.transition(session_id, State.CLASSIFY, "file_first")
         row = self._get(session_id)
 
+        # 상품 미정이면 파일 재단 규격으로 상품을 알아챈다 (90x50 → 명함처럼 당연한 추론)
+        detected = None
+        if not row.product:
+            detected = self._infer_product_from_file(dest)
+            if detected:
+                self.store.set_product(session_id, detected)
+                self.store.record_event(session_id, "product_inferred_from_file", {"product": detected})
+                row = self._get(session_id)
+                if State(row.state) == State.CLASSIFY:
+                    self.store.transition(session_id, State.SLOT_FILLING, "product_from_file")
+                row = self._get(session_id)
+
         # 정식 검판 전이는 SLOT_FILLING/PROOF_CONFIRM에서만 가능 (상품 미정이면 비공식 검판)
         formal = State(row.state) in (State.SLOT_FILLING, State.PROOF_CONFIRM)
         if formal:
@@ -222,7 +241,81 @@ class IntakeService:
             self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
 
         notices = [] if row.product else ["file_received_need_product"]
-        return self._advance(session_id, notices=notices, kind="upload", report=report)
+        result = self._advance(session_id, notices=notices, kind="upload", report=report)
+        if detected:
+            result.directives.detected_product = self.catalog[detected].display_name
+        return result
+
+    def _infer_product_from_file(self, file_path: Path) -> str | None:
+        """파일을 보고 '무엇을 만들려는지' 추정한다 (정확 매칭이 아니라 넉넉한 의도 추정).
+
+        재단 크기를 카탈로그 규격들과 **비례 거리**로 견줘 가장 가까운 상품을 고른다.
+        칼선(별색)이 있으면 스티커/라벨 쪽으로 가중한다. 어느 상품과도 많이 멀면 보류(질문).
+        이건 '제안'이며, 틀리면 고객이 상품명을 말해 바로 바꾼다(오케스트레이터가 override).
+        """
+        from core.preflight.engine import CheckContext
+
+        try:
+            ctx = CheckContext(file_path)
+            size = ctx.trim_size_mm(0)
+            has_dieline = self._file_has_dieline(ctx)
+            ctx.close()
+        except Exception:
+            return None
+        if not size:
+            return None
+        return self._guess_product(size[0], size[1], has_dieline)
+
+    def _file_has_dieline(self, ctx) -> bool:
+        """콘텐츠에서 칼선(별색 Separation) 스트로크 존재 여부 — 스티커/라벨 신호."""
+        try:
+            from core.preflight.contentstream import VectorStroke
+
+            for ev in ctx.content_events(0):
+                if isinstance(ev, VectorStroke) and ev.color.space.startswith("Separation"):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _guess_product(self, w_mm: float, h_mm: float, has_dieline: bool) -> str | None:
+        """재단 크기(+칼선)로 가장 그럴듯한 상품을 추정. 15% 이내로 가까우면 그 상품."""
+        best: tuple[float, str] | None = None  # (거리, 상품)
+        for pid, schema in self.catalog.items():
+            size_slot = schema.slots.get("size")
+            if not size_slot:
+                continue
+            for choice in size_slot.choices:
+                target = choice_to_mm(str(choice))
+                if not target:
+                    continue
+                tw, th = target
+                # 두 방향(가로/세로 교환) 중 가까운 쪽의 비례 거리
+                d = min(
+                    abs(w_mm - tw) / tw + abs(h_mm - th) / th,
+                    abs(w_mm - th) / th + abs(h_mm - tw) / tw,
+                )
+                # 칼선 상품(스티커·라벨)엔 칼선 유무를 반영해 가중
+                if pid in ("sticker", "label"):
+                    d = d * (0.7 if has_dieline else 1.4)
+                elif has_dieline:
+                    d = d * 1.4  # 칼선 있는데 낱장 상품이면 덜 그럴듯
+                if best is None or d < best[0]:
+                    best = (d, pid)
+        if best is None:
+            return None
+        return best[1] if best[0] <= 0.30 else None
+
+    def _reclassify_reset(self, session_id: str) -> None:
+        """상품이 바뀌었을 때: 이전 상품용 사양 슬롯을 비우고, 파일이 있으면 새 상품으로 재검판."""
+        self.store.clear_slots(session_id)
+        row = self._get(session_id)
+        if row.file_path and State(row.state) in (State.SLOT_FILLING, State.PROOF_CONFIRM):
+            if State(row.state) == State.PROOF_CONFIRM:
+                self.store.transition(session_id, State.SLOT_FILLING, "product_changed")
+            self.store.transition(session_id, State.FILE_CHECK, "product_changed_recheck")
+            self._run_preflight(session_id)
+            self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
 
     def handle_autofix(self, session_id: str, check_id: str) -> TurnResult:
         """autofix 적용 (현재 bleed 1종). 고친 파일로 교체 후 재검판."""
@@ -631,6 +724,40 @@ class IntakeService:
         d.auto_filled = decision.auto_filled
         row = self._get(session_id)
 
+        # 뒷면(양면) 확인 — 뒷면이 흔한 상품(명함·전단·엽서·포토카드)에서 앞면 1장만 올렸고
+        # 사용자가 인쇄면을 안 정했으면, 인쇄사가 당연히 묻는 "뒷면 있으세요?"를 묻는다.
+        sides_def = schema.slots.get("sides")
+        if sides_def is not None and report is not None and row.file_path and not row.design_mode:
+            pc = report.by_id("page_count")
+            file_pages = (pc.measured or {}).get("file_pages") if pc else None
+            sides_entry = (row.slots or {}).get("sides", {})
+            if (
+                file_pages == 1
+                and sides_entry.get("source") != "user"
+                and not any(q.slot == "sides" for q in d.questions)
+            ):
+                d.auto_filled = [af for af in d.auto_filled if af.slot != "sides"]
+                d.questions.insert(
+                    0,
+                    SlotQuestion(
+                        slot="sides",
+                        display_name=sides_def.display_name or "인쇄면",
+                        reason="confirm_back_side",
+                        quick_options=["단면", "양면"],
+                    ),
+                )
+                d.offer_back_side = True
+
+        # 양면이라 했는데 앞면 1장뿐이면 뒷면 파일을 요청한다 (뒷면 업로드 시 재검판)
+        needs_back = False
+        if sides_def is not None and report is not None and row.file_path:
+            pc = report.by_id("page_count")
+            file_pages = (pc.measured or {}).get("file_pages") if pc else None
+            if (row.slots or {}).get("sides", {}).get("value") == "double" and file_pages == 1:
+                needs_back = True
+                if "need_back_side_file" not in d.notices:
+                    d.notices.append("need_back_side_file")
+
         # 견적 (필수 슬롯이 다 찼을 때만)
         required_missing = [
             n for n, sd in schema.required_slots().items()
@@ -692,6 +819,7 @@ class IntakeService:
             not d.questions
             and not d.conflicts
             and not required_missing
+            and not needs_back
             and report is not None
             and report.gate_ok
             and quote_result is not None
@@ -701,6 +829,8 @@ class IntakeService:
             if ready:
                 row = self.store.transition(session_id, State.PROOF_CONFIRM, "all_slots_and_checks_ok")
                 d.awaiting_confirm = True
+            elif needs_back:
+                d.request_file = True  # 양면인데 앞면만 → 뒷면 파일 요청
             elif not row.file_path:
                 # 명함은 파일이 없으면 시안 생성을 제안한다 (파일 없는 초보 고객 유입)
                 if row.product in DESIGNABLE_PRODUCTS and not row.design_mode:

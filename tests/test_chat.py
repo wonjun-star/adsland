@@ -79,13 +79,39 @@ def test_process_confirm_button_path():
     assert r.directives.order_no and r.directives.order_no in reply
 
 
-def test_upload_before_product_asks_for_product():
+def test_upload_before_product_infers_from_size():
+    """상품을 안 밝히고 파일부터 올려도 재단 규격으로 상품을 알아챈다 (90x90 → 스티커)."""
     pipe = _pipeline()
     r, _ = pipe.start()
     sid = r.session.id
     r, reply = pipe.process_upload(sid, CLEAN_STICKER)
+    assert r.session.product == "sticker"
+    assert not r.directives.request_product
+    assert "스티커" in reply  # 알아챈 상품을 확인해준다
+
+
+def test_upload_unrecognized_size_still_asks_product(tmp_path):
+    """어느 상품 규격에도 안 맞으면 상품을 묻는다 (추론 보류)."""
+    import pikepdf
+    from reportlab.pdfgen import canvas
+
+    from core.preflight.engine import PT_PER_MM
+
+    w = h = 123 * PT_PER_MM  # 카탈로그에 없는 규격
+    p = tmp_path / "odd.pdf"
+    c = canvas.Canvas(str(p), pagesize=(w, h))
+    c.rect(0, 0, w, h, fill=0, stroke=1)
+    c.save()
+    with pikepdf.open(p, allow_overwriting_input=True) as pdf:
+        pdf.pages[0]["/TrimBox"] = pikepdf.Array([0, 0, w, h])
+        pdf.save(p)
+
+    pipe = _pipeline()
+    r, _ = pipe.start()
+    sid = r.session.id
+    r, reply = pipe.process_upload(sid, p)
+    assert r.session.product is None
     assert r.directives.request_product
-    assert "상품" in reply
 
 
 def test_autofix_without_file_is_graceful():

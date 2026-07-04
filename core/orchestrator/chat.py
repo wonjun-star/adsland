@@ -64,7 +64,8 @@ class ChatPipeline:
         adapter = self.adapter_provider()
         view = self.service.view_session(session_id)
 
-        # 상품 미정일 때만 분류기를 부른다 (정해진 상품을 매 턴 재분류하지 않는다)
+        # 상품 미정이면 분류기로 추정. 이미 정해졌어도 고객이 '다른 상품'을 명시하면
+        # 교체를 허용한다 (파일 기반 추정이 틀렸을 때 "아니 엽서야"로 바로잡는 경로).
         classify: ClassifyProposal | None = None
         if not view.product:
             classify = self._propose(
@@ -73,9 +74,13 @@ class ChatPipeline:
                 llm=lambda: roles.classify_input(text, self.service.catalog, adapter),
                 rule=lambda: roles.classify_input(text, self.service.catalog, None),
             )
+        else:
+            named = roles.classify_input(text, self.service.catalog, None)  # 규칙 기반 상품 키워드
+            if named.product and named.product != view.product:
+                classify = named  # 명시적 상품 변경 → apply_turn이 교체·재검판
 
         product = view.product
-        if not product and classify is not None and classify.product in self.service.catalog:
+        if classify is not None and classify.product in self.service.catalog:
             product = classify.product
 
         # 시안 경로 분기: 명함 + 파일 없음 + (이미 시안 모드 ∨ 내용 제공 ∨ 시안 제작 요청)

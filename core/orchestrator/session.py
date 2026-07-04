@@ -252,6 +252,15 @@ class SessionStore:
             db.commit()
             return row
 
+    def clear_slots(self, session_id: str) -> OrderSession:
+        """사양 슬롯 전체 초기화 (상품 변경 시 이전 상품용 값 제거)."""
+        with self._db() as db:
+            row = self._get_or_raise(db, session_id)
+            row.slots = {}
+            self._append_event(db, row.id, "slots_cleared", {})
+            db.commit()
+            return row
+
     def record_event(self, session_id: str, type_: str, payload: dict | None = None) -> Event:
         """임의 이벤트 기록 (LLM 호출 로그, 견적 산출 등 감사용)."""
         with self._db() as db:
