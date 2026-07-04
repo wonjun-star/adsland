@@ -210,12 +210,14 @@ class IntakeService:
 
         dest_dir = UPLOAD_DIR / session_id
         dest_dir.mkdir(parents=True, exist_ok=True)
-        raw_name = Path(original_name).name or Path(src_path).name or "upload.pdf"
-        dest = dest_dir / raw_name
-        # 앞면을 덮어쓰지 않도록: 이름이 같으면 뒷면 접두사
-        if prev_file and Path(prev_file).name == raw_name and Path(prev_file).resolve() != Path(src_path).resolve():
-            dest = dest_dir / f"back_{raw_name}"
-        if Path(src_path).resolve() != dest.resolve():
+        src_path = Path(src_path)
+        # 매 업로드를 고유 경로에 둔다 — 같은 파일명이어도 앞 파일을 덮지 않게 (뒷면 병합의 전제).
+        if src_path.parent.resolve() == dest_dir.resolve():
+            dest = src_path  # 이미 세션 폴더의 고유 경로(API가 저장) → 그대로 사용
+        else:
+            seq = len(list(dest_dir.glob("up_*")))
+            safe = (Path(original_name).name or src_path.name or "upload.pdf").replace("/", "_")
+            dest = dest_dir / f"up_{seq:02d}_{safe}"
             shutil.copy2(src_path, dest)
 
         # 뒷면 병합: 앞면 1장이 이미 있고, 이번이 두 번째 파일이면 뒷면으로 보고 2페이지로 합친다.

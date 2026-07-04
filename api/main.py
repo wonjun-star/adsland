@@ -284,10 +284,13 @@ def create_app() -> FastAPI:
 
         dest_dir = UPLOAD_DIR / session_id
         dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = dest_dir / _safe_filename(file.filename)
+        # 매 업로드를 고유 경로에 저장 — 같은 파일명을 두 번 올려도 앞 파일을 덮지 않게
+        safe = _safe_filename(file.filename)
+        seq = len(list(dest_dir.glob("up_*")))
+        dest = dest_dir / f"up_{seq:02d}_{safe}"
         dest.write_bytes(content)
 
-        result, reply = run_or_404(pipeline.process_upload, session_id, dest, dest.name)
+        result, reply = run_or_404(pipeline.process_upload, session_id, dest, safe)
 
         extra: list[dict] = []
         preview = _render_first_page_preview(dest, session_id)
