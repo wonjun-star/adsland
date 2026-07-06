@@ -1,7 +1,6 @@
 // 어시스턴트 말풍선 아래에 붙는 결과 카드들 (docs/API.md cards[] 계약).
 // 카드의 숫자·판정은 전부 서버(결정론적 엔진) 출력이며 UI는 표기만 담당한다.
 
-import { Fragment } from 'react'
 import { fileUrl } from '../api'
 import {
   checkLabel,
@@ -62,10 +61,42 @@ function BeforeAfter({
   )
 }
 
+/** 검판 항목 한 줄 (문제 항목은 상세·조치까지, 통과 항목은 접힘 안에서 간단히). */
+function CheckRow({ result, latest, busy, onAutofix, passOnly }) {
+  const meta = STATUS_META[result.status] || { className: 'unknown' }
+  const measured = measuredSummary(result)
+  const canAutofix = latest && result.status === 'fail' && result.autofix?.available
+  return (
+    <li className={`check-row ${meta.className}`}>
+      <div className="check-row-head">
+        <span className="check-name">{checkLabel(result.check_id)}</span>
+        <StatusBadge status={result.status} />
+      </div>
+      {measured && <div className="check-measured">{measured}</div>}
+      {!passOnly && result.message && <p className={`check-message ${meta.className}`}>{result.message}</p>}
+      {passOnly && result.message && (
+        <details className="check-message-toggle">
+          <summary>설명 보기</summary>
+          <p className="check-message pass">{result.message}</p>
+        </details>
+      )}
+      {canAutofix && (
+        <div className="check-action">
+          <button type="button" className="btn small accent" disabled={busy} onClick={() => onAutofix(result.check_id)}>
+            자동 보정 적용
+          </button>
+        </div>
+      )}
+    </li>
+  )
+}
+
 function PreflightCard({ card, latest, busy, onAutofix }) {
   const results = card.results || []
+  const problems = results.filter((r) => r.status !== 'pass')
+  const passes = results.filter((r) => r.status === 'pass')
   return (
-    <div className="card">
+    <div className="card preflight-card">
       {card.gate_ok ? (
         <div className="gate-banner ok">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -77,63 +108,25 @@ function PreflightCard({ card, latest, busy, onAutofix }) {
           인쇄 전에 확인이 필요한 항목이 있어요
         </div>
       )}
-      <div className="table-scroll">
-        <table className="check-table">
-          <thead>
-            <tr>
-              <th>검사 항목</th>
-              <th>판정</th>
-              <th>측정 결과</th>
-              <th aria-label="조치"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r) => {
-              const meta = STATUS_META[r.status] || { className: 'unknown' }
-              const hasMessage = Boolean(r.message)
-              const isProblem = r.status !== 'pass'
-              return (
-                <Fragment key={r.check_id}>
-                  <tr className={hasMessage ? 'has-message' : undefined}>
-                    <th scope="row">{checkLabel(r.check_id)}</th>
-                    <td><StatusBadge status={r.status} /></td>
-                    <td className="measured">{measuredSummary(r)}</td>
-                    <td className="action-cell">
-                      {latest && r.status === 'fail' && r.autofix?.available && (
-                        <button
-                          type="button"
-                          className="btn small accent"
-                          disabled={busy}
-                          onClick={() => onAutofix(r.check_id)}
-                        >
-                          자동 보정 적용
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                  {hasMessage && isProblem && (
-                    <tr className="message-row">
-                      <td colSpan={4}>
-                        <p className={`check-message ${meta.className}`}>{r.message}</p>
-                      </td>
-                    </tr>
-                  )}
-                  {hasMessage && !isProblem && (
-                    <tr className="message-row">
-                      <td colSpan={4}>
-                        <details className="check-message-toggle">
-                          <summary>설명 보기</summary>
-                          <p className={`check-message ${meta.className}`}>{r.message}</p>
-                        </details>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+
+      {problems.length > 0 && (
+        <ul className="check-list">
+          {problems.map((r) => (
+            <CheckRow key={r.check_id} result={r} latest={latest} busy={busy} onAutofix={onAutofix} />
+          ))}
+        </ul>
+      )}
+
+      {passes.length > 0 && (
+        <details className="check-passes">
+          <summary>통과한 항목 {passes.length}개 보기</summary>
+          <ul className="check-list passes">
+            {passes.map((r) => (
+              <CheckRow key={r.check_id} result={r} passOnly />
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }
@@ -141,49 +134,60 @@ function PreflightCard({ card, latest, busy, onAutofix }) {
 function QuoteCard({ card }) {
   const lines = card.lines || []
   const estimate = card.estimate === true
+  const hasBreakdown = lines.length > 0 || card.supply_amount !== undefined || card.vat !== undefined
   return (
-    <div className="card">
-      <div className="card-title">
-        {estimate ? '예상 견적' : '견적서'}
+    <div className="card quote-card">
+      <div className="quote-head">
+        <span className="quote-label">{estimate ? '예상 견적' : '견적'}</span>
         {card.product && <span className="card-title-sub">{productLabel(card.product)}</span>}
-        {estimate && <span className="estimate-badge">추정가</span>}
+        {estimate && <span className="estimate-badge">확정 시 정확</span>}
       </div>
-      {estimate && (
-        <p className="estimate-note">사양이 확정되면 정확한 금액으로 업데이트돼요.</p>
+
+      <div className="quote-total">
+        <span className="quote-total-amount">{money(card.total)}</span>
+        <span className="quote-total-note">
+          {card.vat_included !== false ? '부가세 포함' : '부가세 별도'}
+          {estimate ? ' · 예상 금액' : ''}
+        </span>
+      </div>
+
+      {estimate && <p className="estimate-note">사양이 확정되면 정확한 금액으로 업데이트돼요.</p>}
+
+      {hasBreakdown && (
+        <details className="quote-breakdown">
+          <summary>세부 내역 보기</summary>
+          <div className="table-scroll">
+            <table className="quote-table">
+              <tbody>
+                {lines.map((line, i) => (
+                  <tr key={i}>
+                    <th scope="row">{quoteLineLabel(line)}</th>
+                    <td className="amount">{money(line.amount)}</td>
+                  </tr>
+                ))}
+                {card.supply_amount !== undefined && (
+                  <tr className="subtotal">
+                    <th scope="row">공급가액</th>
+                    <td className="amount">{money(card.supply_amount)}</td>
+                  </tr>
+                )}
+                {card.vat !== undefined && (
+                  <tr className="subtotal">
+                    <th scope="row">부가세 (10%)</th>
+                    <td className="amount">{money(card.vat)}</td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="total">
+                  <th scope="row">{estimate ? '예상 합계' : '합계'}</th>
+                  <td className="amount total-amount">{money(card.total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </details>
       )}
-      <div className="table-scroll">
-        <table className="quote-table">
-          <tbody>
-            {lines.map((line, i) => (
-              <tr key={i}>
-                <th scope="row">{quoteLineLabel(line)}</th>
-                <td className="amount">{money(line.amount)}</td>
-              </tr>
-            ))}
-            {card.supply_amount !== undefined && (
-              <tr className="subtotal">
-                <th scope="row">공급가액</th>
-                <td className="amount">{money(card.supply_amount)}</td>
-              </tr>
-            )}
-            {card.vat !== undefined && (
-              <tr className="subtotal">
-                <th scope="row">부가세 (10%)</th>
-                <td className="amount">{money(card.vat)}</td>
-              </tr>
-            )}
-          </tbody>
-          <tfoot>
-            <tr className="total">
-              <th scope="row">
-                {estimate ? '예상 합계' : '합계'}
-                {card.vat_included !== false ? ' (부가세 포함)' : ''}
-              </th>
-              <td className="amount total-amount">{money(card.total)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
     </div>
   )
 }

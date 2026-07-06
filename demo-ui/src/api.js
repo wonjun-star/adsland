@@ -55,6 +55,15 @@ export function designTemplate(sessionId, body) {
   return api(`/api/session/${sessionId}/design`, { method: 'POST', body })
 }
 
+/**
+ * 오더지(작업지시서) 조회 (GET /api/session/{id}/ordersheet).
+ * 고객과의 대화로 만들어진 내부 검수자용 주문서 스냅샷을 반환한다.
+ * @param {string} sessionId
+ */
+export function orderSheet(sessionId) {
+  return api(`/api/session/${sessionId}/ordersheet`)
+}
+
 /** 서버가 준 파일 경로/URL → 브라우저가 접근 가능한 URL (GET /api/files/{name}) */
 export function fileUrl(pathOrUrl) {
   if (!pathOrUrl) return ''

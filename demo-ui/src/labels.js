@@ -13,6 +13,7 @@ export const PRODUCT_LABELS = {
   postcard: '엽서',
   memopad: '떡메모지',
   photocard: '포토카드',
+  banner: '현수막·배너',
 }
 
 export const SLOT_LABELS = {

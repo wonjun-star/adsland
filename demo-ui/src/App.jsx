@@ -7,16 +7,24 @@ import { api, ApiError, designTemplate } from './api'
 import AccessGate from './components/AccessGate'
 import BoardPanel from './components/BoardPanel'
 import ChatPane from './components/ChatPane'
+import OrderSheet from './components/OrderSheet'
 import SidePanel from './components/SidePanel'
 
 let nextMessageId = 1
+
+// 메인 보기 모드: 상담(채팅) / 오더지(작업지시서) / 비교(기존 게시판 대비)
+const VIEWS = [
+  { id: 'chat', label: '상담' },
+  { id: 'sheet', label: '오더지' },
+  { id: 'compare', label: '비교' },
+]
 
 export default function App() {
   const [locked, setLocked] = useState(null) // null = 접속 확인 중
   const [session, setSession] = useState(null)
   const [messages, setMessages] = useState([])
   const [busy, setBusy] = useState(false)
-  const [compare, setCompare] = useState(false)
+  const [view, setView] = useState('chat') // 'chat' | 'sheet' | 'compare'
   const initialized = useRef(false)
 
   const push = useCallback((msg) => {
@@ -160,46 +168,57 @@ export default function App() {
           </span>
           <div className="brand-text">
             <h1>AI 파일접수·검판 데스크</h1>
-            <span>프로토타입 · 파일 접수부터 견적 확정까지</span>
+            <span>파일 접수부터 견적 확정까지</span>
           </div>
         </div>
+
+        <nav className="view-tabs" role="tablist" aria-label="보기 전환">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              role="tab"
+              aria-selected={view === v.id}
+              className={view === v.id ? 'view-tab active' : 'view-tab'}
+              onClick={() => setView(v.id)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </nav>
+
         <div className="topbar-actions">
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={compare}
-              onChange={(e) => setCompare(e.target.checked)}
-            />
-            <span className="knob" aria-hidden="true" />
-            비교 데모
-          </label>
           <button type="button" className="btn ghost" onClick={startSession} disabled={busy}>
             새 상담
           </button>
         </div>
       </header>
 
-      {compare && (
+      {view === 'compare' && (
         <div className="compare-banner">
           같은 주문, 두 방식 — 기존 게시판 왕복 <strong>반나절</strong> vs AI 접수 <strong>30초</strong>
         </div>
       )}
 
-      <div className={compare ? 'workspace compare' : 'workspace'}>
-        {compare && <BoardPanel />}
-        <ChatPane
-          messages={messages}
-          busy={busy}
-          session={session}
-          onSend={sendMessage}
-          onUpload={uploadFile}
-          onAutofix={applyAutofix}
-          onDesign={applyDesign}
-          onConfirm={confirmOrder}
-          onReject={rejectConfirm}
-        />
-        <SidePanel session={session} />
-      </div>
+      {view === 'sheet' ? (
+        <OrderSheet sessionId={session?.id} session={session} />
+      ) : (
+        <div className={view === 'compare' ? 'workspace compare' : 'workspace'}>
+          {view === 'compare' && <BoardPanel />}
+          <ChatPane
+            messages={messages}
+            busy={busy}
+            session={session}
+            onSend={sendMessage}
+            onUpload={uploadFile}
+            onAutofix={applyAutofix}
+            onDesign={applyDesign}
+            onConfirm={confirmOrder}
+            onReject={rejectConfirm}
+          />
+          <SidePanel session={session} />
+        </div>
+      )}
     </div>
   )
 }
