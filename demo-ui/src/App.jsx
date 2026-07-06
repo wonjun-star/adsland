@@ -161,6 +161,39 @@ export default function App() {
     [session, busy, push, runTurn],
   )
 
+  // 여러 질문을 버튼으로 한꺼번에 고른 뒤 접수 — 순서대로 반영하고 마지막 응답만 보여준다
+  // (하나 고를 때마다 왕복하며 나머지 버튼이 사라지던 문제 해결).
+  const selectMany = useCallback(
+    async (picks) => {
+      if (!session || busy || !picks?.length) return
+      if (picks.length === 1) {
+        selectOption(picks[0].slot, picks[0].value, picks[0].label)
+        return
+      }
+      push({ role: 'user', text: picks.map((p) => p.label ?? String(p.value)).join(' · ') })
+      setBusy(true)
+      try {
+        let data
+        for (const p of picks) {
+          data = await api(`/api/session/${session.id}/select`, {
+            method: 'POST',
+            body: { slot: p.slot, value: p.value },
+          })
+        }
+        pushReply(data)
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          setLocked(true)
+          return
+        }
+        push({ role: 'system', text: e.message || '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.' })
+      } finally {
+        setBusy(false)
+      }
+    },
+    [session, busy, push, pushReply, selectOption],
+  )
+
   const confirmOrder = useCallback(() => {
     if (!session || busy) return
     push({ role: 'user', text: '네, 이대로 확정할게요.' })
@@ -234,6 +267,7 @@ export default function App() {
             session={session}
             onSend={sendMessage}
             onSelect={selectOption}
+            onSelectMany={selectMany}
             onUpload={uploadFiles}
             onAutofix={applyAutofix}
             onDesign={applyDesign}

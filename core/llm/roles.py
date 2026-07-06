@@ -976,6 +976,26 @@ def _question_line(q: Any, schema: ProductSchema | None) -> str:
     return base
 
 
+def _rang(word: str) -> str:
+    """받침 유무에 따라 '랑/이랑' — '사이즈랑', '수량이랑'."""
+    if not word:
+        return "랑"
+    last = word[-1]
+    if "가" <= last <= "힣":
+        return "이랑" if (ord(last) - 0xAC00) % 28 else "랑"
+    return "랑"
+
+
+def _merged_question_line(qs: list[Any], schema: ProductSchema | None) -> str:
+    """물을 게 여러 개면 한 문장으로 묶는다 — 사람처럼. (옵션 값은 버튼으로 화면에 뜬다)"""
+    names = [q.display_name or _slot_display(q.slot, schema) for q in qs]
+    if len(names) == 2:
+        joined = f"{names[0]}{_rang(names[0])} {names[1]}"
+    else:
+        joined = ", ".join(names[:-1]) + f", {names[-1]}"
+    return f"{joined}만 정하면 바로 진행할게요. 아래에서 눌러 골라주셔도 돼요."
+
+
 def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
     """기계 코드(notices) → 부드러운 안내. 내부용 코드는 None(침묵)."""
     if code.startswith("invalid_value:"):
@@ -1211,12 +1231,16 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
         inferred, user = _label(c.inferred_value), _label(c.user_value)
         parts.append(f"{display} — 파일은 {inferred}, 말씀은 {user}. 어느 쪽으로 할까요?")
 
-    # 남은 질문만 (자동 채운 값은 사이드 요약에 있으니 문장에서 반복하지 않음)
-    for q in d.questions:
-        if q.slot == "sides" and getattr(d, "offer_back_side", False):
-            parts.append("앞면 확인했어요 — 단면으로 할까요, 양면으로 할까요? 양면이면 뒷면 파일도 올려주세요.")
-        else:
-            parts.append(_question_line(q, schema))
+    # 남은 질문만 (자동 채운 값은 사이드 요약에 있으니 문장에서 반복하지 않음).
+    # 여러 개면 한 문장으로 묶어 사람처럼 — 빠진 것만 콕 집어 묻는다.
+    back_side_qs = [q for q in d.questions if q.slot == "sides" and getattr(d, "offer_back_side", False)]
+    normal_qs = [q for q in d.questions if q not in back_side_qs]
+    for _q in back_side_qs:
+        parts.append("앞면 확인했어요 — 단면으로 할까요, 양면으로 할까요? 양면이면 뒷면 파일도 올려주세요.")
+    if len(normal_qs) == 1:
+        parts.append(_question_line(normal_qs[0], schema))
+    elif len(normal_qs) >= 2:
+        parts.append(_merged_question_line(normal_qs, schema))
 
     # 확정 단계 — 검토 → 최종본 → 진행. (단, 고객이 질문한 턴엔 확정 재촉하지 않는다)
     if d.awaiting_confirm and not getattr(d, "customer_question", ""):
