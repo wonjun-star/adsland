@@ -8,15 +8,15 @@ slots:
     required: true
     infer_from: [file_trimbox]
     ask_if_conflict: true
-    choices: ["90x50", "86x54"]
+    choices: ["90x50", "86x52"]
     unit: mm
     synonyms:
       "일반 명함": "90x50"
       "표준": "90x50"
       "보통 명함": "90x50"
-      "카드형": "86x54"
-      "카드 사이즈": "86x54"
-      "신용카드만한": "86x54"
+      "카드형": "86x52"
+      "카드 사이즈": "86x52"
+      "신용카드만한": "86x52"
   quantity:
     display_name: 수량
     required: true
