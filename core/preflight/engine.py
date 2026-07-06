@@ -39,7 +39,12 @@ def mm_to_pt(v: float) -> float:
 
 
 class OrderContext:
-    """주문 정보 중 검사에 필요한 부분 (page_size, page_count 검사용)."""
+    """주문 정보 중 검사에 필요한 부분.
+
+    애즈랜드 가이드 기반 품목별 임계값(도련·안전여백·총잉크량·선굵기)을 함께 담아,
+    각 체크가 품목에 맞는 기준으로 판정한다(예: 명함 도련 1mm, 스티커 3mm). 값이 None이면
+    체크가 자체 기본값을 쓴다 (오케스트레이터가 core/preflight/adsland_guide.py에서 채운다).
+    """
 
     def __init__(
         self,
@@ -47,11 +52,19 @@ class OrderContext:
         size_mm: tuple[float, float] | None = None,  # 재단 규격 (w, h)
         page_count: int | None = None,
         cut_type: str | None = None,  # square|circle|die_cut — 칼선 필요 여부 판정용
+        bleed_mm: float | None = None,        # 품목별 요구 재단여백
+        safety_mm: float | None = None,       # 품목별 안전여백
+        max_ink_percent: float | None = None,  # 품목별 총잉크량 상한
+        min_line_pt: float | None = None,     # 품목별 권장 최소 선굵기
     ):
         self.product = product
         self.size_mm = size_mm
         self.page_count = page_count
         self.cut_type = cut_type
+        self.bleed_mm = bleed_mm
+        self.safety_mm = safety_mm
+        self.max_ink_percent = max_ink_percent
+        self.min_line_pt = min_line_pt
 
 
 class CheckContext:

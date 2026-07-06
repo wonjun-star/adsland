@@ -87,7 +87,39 @@ function CheckRow({ result, latest, busy, onAutofix, passOnly }) {
           </button>
         </div>
       )}
+      {!passOnly && result.fix_guide && <FixGuide guide={result.fix_guide} />}
     </li>
+  )
+}
+
+// 애즈랜드 작업 가이드 근거 + 고치는 법 (통과 못 한 항목에 표시)
+const PROGRAM_LABEL = { illustrator: '일러스트', photoshop: '포토샵', indesign: '인디자인', common: '공통' }
+
+function FixGuide({ guide }) {
+  const steps = Object.entries(guide.how_to_fix || {})
+  return (
+    <details className="fix-guide">
+      <summary>가이드대로 고치는 법</summary>
+      <div className="fix-guide-body">
+        <p className="fix-rule">📐 {guide.rule}</p>
+        {guide.why && <p className="fix-why">{guide.why}</p>}
+        {steps.length > 0 && (
+          <ul className="fix-steps">
+            {steps.map(([prog, step]) => (
+              <li key={prog}>
+                <span className="fix-prog">{PROGRAM_LABEL[prog] || prog}</span> {step}
+              </li>
+            ))}
+          </ul>
+        )}
+        {guide.autofixable && <p className="fix-auto">✓ 저희가 자동으로 보정해드릴 수 있어요.</p>}
+        {guide.guide_url && (
+          <a className="fix-link" href={guide.guide_url} target="_blank" rel="noreferrer">
+            애즈랜드 작업 가이드 보기 →
+          </a>
+        )}
+      </div>
+    </details>
   )
 }
 

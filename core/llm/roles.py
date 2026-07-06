@@ -958,6 +958,18 @@ def render_reply(
                 "현재선택": _label(info["current"]) if info.get("current") is not None else None,
                 "가격_부가세포함": {_label(c["value"]): c["total"] for c in info.get("choices", [])},
             }
+        # 통과 못 한 검판 항목엔 애즈랜드 가이드 근거 수정 안내를 함께 넘긴다 (가이드대로 설명하게)
+        fix_guides: list[dict[str, Any]] = []
+        if directives.report is not None:
+            from core.preflight.adsland_guide import remediation_for
+
+            for r in directives.report.results:
+                if str(r.status) == "pass":
+                    continue
+                rem = remediation_for(r.check_id)
+                if rem is not None:
+                    fix_guides.append({"항목": rem.title, "규칙": rem.rule, "이유": rem.why,
+                                       "자동보정가능": rem.autofixable})
         payload = {
             "directives": directives.model_dump(mode="json"),
             "session": view.model_dump(mode="json"),
@@ -965,6 +977,7 @@ def render_reply(
             "available_options": available,  # 이 목록 밖의 값은 절대 제안하지 마라
             "customer_message": directives.customer_message,  # 고객이 방금 한 말 원문
             "prices_by_option": prices_by_option,  # 옵션별 실제 계산가 (지어내지 말 것)
+            "fix_guides": fix_guides,  # 검판 문제 항목의 가이드 근거 수정 안내
         }
         system = _load_prompt("dialog_v1.md")
         raw = adapter.complete(

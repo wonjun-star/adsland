@@ -899,6 +899,91 @@ textarea {
   margin-top: 2px;
 }
 
+/* 애즈랜드 가이드 근거 + 고치는 법 */
+.fix-guide {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 10px);
+  background: var(--accent-weak);
+  overflow: hidden;
+}
+
+.fix-guide > summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  list-style: none;
+}
+
+.fix-guide > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fix-guide > summary::before {
+  content: '🛠 ';
+}
+
+.fix-guide-body {
+  padding: 4px 14px 12px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.fix-rule {
+  font-weight: 700;
+  color: var(--accent-ink);
+  margin: 4px 0;
+}
+
+.fix-why {
+  color: var(--muted);
+  margin: 4px 0 8px;
+}
+
+.fix-steps {
+  margin: 4px 0;
+  padding-left: 2px;
+  list-style: none;
+}
+
+.fix-steps li {
+  margin: 5px 0;
+}
+
+.fix-prog {
+  display: inline-block;
+  min-width: 44px;
+  padding: 1px 7px;
+  margin-right: 6px;
+  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.fix-auto {
+  color: var(--accent);
+  font-weight: 600;
+  margin: 6px 0 2px;
+}
+
+.fix-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.fix-link:hover {
+  text-decoration: underline;
+}
+
 .check-passes {
   border-top: 1px solid var(--line);
   padding-top: 14px;

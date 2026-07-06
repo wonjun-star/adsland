@@ -29,8 +29,16 @@ _KIND = {VectorFill: "fill", VectorStroke: "stroke", TextShow: "text"}
 
 @register_check("ink_total")
 def check_ink_total(ctx: CheckContext) -> CheckResult:
-    """전 페이지의 벡터·텍스트 DeviceCMYK 잉크 합 최대값을 재고 300% 초과면 warn."""
-    required = {"max_percent": 300}
+    """전 페이지의 벡터·텍스트 DeviceCMYK 잉크 합 최대값을 재고 상한 초과면 warn.
+
+    상한은 애즈랜드 가이드 품목별: 전단·포스터·리플렛 250%, 그 외 300%.
+    """
+    max_percent = (
+        ctx.order.max_ink_percent
+        if (ctx.order and ctx.order.max_ink_percent is not None)
+        else MAX_INK_PERCENT
+    )
+    required = {"max_percent": round(max_percent)}
     autofix = AutofixInfo(available=False, note="본개발: 잉크 리미팅 예정")
 
     try:
@@ -54,7 +62,7 @@ def check_ink_total(ctx: CheckContext) -> CheckResult:
                     continue
                 if pct > max_ink:
                     max_ink = pct
-                if pct > MAX_INK_PERCENT + TOLERANCE:
+                if pct > max_percent + TOLERANCE:
                     over_count += 1
                     bad_pages.add(page_i)
                     if len(over_objects) < MAX_OVER_OBJECTS:
@@ -77,11 +85,11 @@ def check_ink_total(ctx: CheckContext) -> CheckResult:
         "over_count": over_count,
     }
     status = (
-        CheckStatus.PASS if max_ink <= MAX_INK_PERCENT + TOLERANCE else CheckStatus.WARN
+        CheckStatus.PASS if max_ink <= max_percent + TOLERANCE else CheckStatus.WARN
     )
     detail = (
         f"벡터·텍스트 DeviceCMYK 잉크 합 최대 {max_ink:.1f}% "
-        f"(기준 ≤{MAX_INK_PERCENT:.0f}%, +{TOLERANCE}%p 허용). "
+        f"(기준 ≤{max_percent:.0f}%, +{TOLERANCE}%p 허용). "
         f"이미지 제외(벡터만) — 이미지 픽셀 잉크량은 프로토타입 범위 밖."
     )
     return result(

@@ -621,7 +621,11 @@ class IntakeService:
         src = Path(row.file_path)
         fixed = src.parent / f"{src.stem}_fixed.pdf"
         pv_dir = PREVIEW_DIR / session_id
-        fix_result = extend_bleed(src, fixed, bleed_mm=3.0, preview_dir=pv_dir)
+        # 품목별 요구 도련만큼 보정 (명함 1mm / 전단 2mm / 스티커 3mm)
+        from core.preflight.adsland_guide import rule_for
+
+        bleed_mm = rule_for(row.product).bleed_mm or 3.0
+        fix_result = extend_bleed(src, fixed, bleed_mm=bleed_mm, preview_dir=pv_dir)
         self.store.set_file_path(session_id, str(fixed))
         self.store.record_event(session_id, "autofix_applied", {"check_id": check_id, **fix_result})
 
@@ -994,11 +998,19 @@ class IntakeService:
         if size_value and (row.slots["size"].get("source") != "inferred"):
             size_mm = choice_to_mm(str(size_value))
         cut_type = (row.slots or {}).get("cut_type", {}).get("value")
+        # 애즈랜드 가이드 기반 품목별 임계값 (도련·안전여백·총잉크량·선굵기)
+        from core.preflight.adsland_guide import rule_for, safety_mm_for
+
+        gr = rule_for(row.product)
         return OrderContext(
             product=row.product,
             size_mm=size_mm,
             page_count=self._expected_pages(row) if row.product else None,
             cut_type=cut_type,
+            bleed_mm=gr.bleed_mm,
+            safety_mm=safety_mm_for(row.product, cut_type),
+            max_ink_percent=gr.max_ink_percent,
+            min_line_pt=gr.min_line_pt,
         )
 
     def _run_preflight(self, session_id: str) -> PreflightReport:
@@ -1387,11 +1399,23 @@ class IntakeService:
         cards: list[dict] = []
         if d.report is not None and d.kind in ("upload", "autofix"):
             from core.llm.roles import translate_check  # 항목별 고객 언어 설명(카드용)
+            from core.preflight.adsland_guide import guide_url, remediation_for
 
             results = []
             for r in d.report.results:
                 rd = r.model_dump(mode="json")
                 rd["message"] = translate_check(r)  # 상세 설명은 카드에 (챗은 결과 요약만)
+                # 통과 못 한 항목엔 애즈랜드 가이드 근거 수정 안내를 붙인다 (왜·어떻게·가이드 링크)
+                if str(r.status) != "pass":
+                    rem = remediation_for(r.check_id)
+                    if rem is not None:
+                        rd["fix_guide"] = {
+                            "rule": rem.rule,
+                            "why": rem.why,
+                            "how_to_fix": rem.how_to_fix,
+                            "autofixable": rem.autofixable,
+                            "guide_url": guide_url(rem.source),
+                        }
                 results.append(rd)
             cards.append(
                 {

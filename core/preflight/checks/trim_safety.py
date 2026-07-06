@@ -56,7 +56,11 @@ def _min_dist_mm(
 
 @register_check("trim_safety")
 def check_trim_safety(ctx: CheckContext) -> CheckResult:
-    required = {"safe_margin_mm": SAFE_MARGIN_MM}
+    # 애즈랜드 가이드 품목별 안전여백: 명함·사각스티커 2mm / 도무송·리플렛 3mm (없으면 기본 3mm)
+    safe_mm = (
+        ctx.order.safety_mm if (ctx.order and ctx.order.safety_mm is not None) else SAFE_MARGIN_MM
+    )
+    required = {"safe_margin_mm": safe_mm}
     try:
         import pypdfium2.raw as pdfium_raw
 
@@ -78,7 +82,7 @@ def check_trim_safety(ctx: CheckContext) -> CheckResult:
                 # run = [마지막 index, 문자열, 병합 bbox]
                 runs: list[list] = []
                 for idx, ch, box in _iter_chars(tp, pdfium_raw):
-                    if _min_dist_mm(box, trim) >= SAFE_MARGIN_MM - TOL_MM:
+                    if _min_dist_mm(box, trim) >= safe_mm - TOL_MM:
                         continue
                     if runs and idx - runs[-1][0] <= 2:  # gap 2 = 공백 1자 건너뜀
                         last = runs[-1]
@@ -136,7 +140,7 @@ def check_trim_safety(ctx: CheckContext) -> CheckResult:
                 required=required,
                 pages=sorted(bad_pages),
                 detail=(
-                    f"텍스트 {total_runs}건이 재단선 {SAFE_MARGIN_MM}mm 안전영역 침범"
+                    f"텍스트 {total_runs}건이 재단선 {safe_mm:g}mm 안전영역 침범"
                     f" (최소 이격 {worst}mm) — 의도 여부 고객 확인 필요"
                 ),
             )
@@ -146,7 +150,7 @@ def check_trim_safety(ctx: CheckContext) -> CheckResult:
             CheckStatus.PASS,
             measured=measured,
             required=required,
-            detail=f"모든 텍스트가 재단선에서 {SAFE_MARGIN_MM}mm 이상 안쪽",
+            detail=f"모든 텍스트가 재단선에서 {safe_mm:g}mm 이상 안쪽",
         )
     except Exception as e:
         # 체크 내부 예외는 밖으로 내보내지 않는다 — 판단 불가로 격리

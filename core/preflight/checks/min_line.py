@@ -26,7 +26,14 @@ _MAX_LISTED = 20
 
 @register_check("min_line")
 def check_min_line(ctx: CheckContext) -> CheckResult:
-    """전 페이지 스트로크 유효 폭을 검사해 0.25pt 미만(0 포함)이 있으면 warn."""
+    """전 페이지 스트로크 유효 폭을 검사해 권장 최소 굵기 미만이면 warn.
+
+    애즈랜드 가이드는 '0.5pt 미만 선 금지'(점선처럼 끊겨 보임). 없으면 기본 0.25pt(물리 한계).
+    warn 등급이라 주문을 막지는 않고, 얇은 선을 고지만 한다.
+    """
+    min_pt = (
+        ctx.order.min_line_pt if (ctx.order and ctx.order.min_line_pt) else MIN_LINE_PT
+    )
     try:
         thin: list[dict] = []          # 기준 미달 스트로크 [{"page", "width_pt"}]
         widths: list[float] = []       # 인쇄되는 스트로크 전체 폭 (min 계산용)
@@ -42,7 +49,7 @@ def check_min_line(ctx: CheckContext) -> CheckResult:
                     continue
                 w = float(ev.line_width_pt)
                 widths.append(w)
-                if w < MIN_LINE_PT - _EPS:
+                if w < min_pt - _EPS:
                     thin.append({"page": page_i, "width_pt": round(w, 4)})
                     pages_bad.add(page_i)
 
@@ -53,7 +60,7 @@ def check_min_line(ctx: CheckContext) -> CheckResult:
             "thin_stroke_count": len(thin),
             "stroke_count": len(widths),
         }
-        required = {"min_pt": MIN_LINE_PT}
+        required = {"min_pt": min_pt}
 
         if thin:
             return result(
@@ -63,7 +70,7 @@ def check_min_line(ctx: CheckContext) -> CheckResult:
                 required=required,
                 pages=sorted(pages_bad),
                 detail=(
-                    f"{len(thin)} stroke(s) below {MIN_LINE_PT}pt; "
+                    f"{len(thin)} stroke(s) below {min_pt:g}pt; "
                     f"min={measured['min_width_pt']}pt"
                 ),
             )
@@ -75,7 +82,7 @@ def check_min_line(ctx: CheckContext) -> CheckResult:
             detail=(
                 "no printing strokes"
                 if not widths
-                else f"all {len(widths)} stroke(s) >= {MIN_LINE_PT}pt (min={measured['min_width_pt']}pt)"
+                else f"all {len(widths)} stroke(s) >= {min_pt:g}pt (min={measured['min_width_pt']}pt)"
             ),
         )
     except Exception as e:  # 판단 불가 상황은 uncertain으로 격리 (예외 전파 금지)

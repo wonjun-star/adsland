@@ -90,13 +90,18 @@ def _measure(ctx: CheckContext) -> CheckResult:
     no_media_pages: list[int] = []     # MediaBox조차 해석 불가 → 판단 불가 페이지
 
     order_mm = ctx.order.size_mm if ctx.order else None
+    # 애즈랜드 가이드 품목별 도련: 명함 1mm / 전단 2mm / 스티커 3mm (없으면 기본 3mm)
+    required_mm = (
+        ctx.order.bleed_mm if (ctx.order and ctx.order.bleed_mm is not None) else REQUIRED_MM
+    )
+    floor_mm = max(0.0, required_mm - TOLERANCE_MM)
 
     page_count = ctx.page_count
     if page_count == 0:
         return result(
             "bleed",
             CheckStatus.UNCERTAIN,
-            required={"min_mm": REQUIRED_MM},
+            required={"min_mm": required_mm},
             detail="페이지가 없는 PDF — 재단여백 판단 불가",
         )
 
@@ -115,24 +120,24 @@ def _measure(ctx: CheckContext) -> CheckResult:
         box_insets = _insets_from_boxes(trim if trim is not None else media, media, bleed_box)
         box_min = min(box_insets.values())
 
-        # 2) 박스상 여백이 사실상 0인데(도련 미표기·trim==media) 파일이 재단선(주문 규격)보다
-        #    크면, 그 여분이 곧 재단여백이다 — 고객이 크기에 여백을 포함해 넣은 것.
-        if box_min + _EPS < INTENTIONAL_BLEED_MIN_MM and order_mm:
+        # 2) 박스상 여백이 품목 요구치에 못 미치는데(도련 미표기·trim==media 등) 파일이
+        #    재단선(주문 규격)보다 크면, 그 여분을 재단여백으로 다시 잰다 — 고객이 크기에
+        #    여백을 포함해 넣은 경우. (판정 기준은 아래 floor_mm = 품목 요구 도련)
+        if box_min + _EPS < required_mm and order_mm:
             derived = _insets_from_order(media, order_mm)
-            if derived is not None and min(derived.values()) + _EPS >= INTENTIONAL_BLEED_MIN_MM:
+            if derived is not None and min(derived.values()) > box_min + _EPS:
                 box_insets = derived
                 order_derived = True
-                order_bleed_pages.append(i)
-
-        if not order_derived and trim is None:
-            no_trim_pages.append(i)
 
         insets_mm = box_insets
+        page_min = min(insets_mm.values())
+        if order_derived and page_min + _EPS >= floor_mm:
+            order_bleed_pages.append(i)  # 규격+여백 파일 (통과) — 긍정 표시
+        if not order_derived and trim is None:
+            no_trim_pages.append(i)
         for side, v in insets_mm.items():
             min_insets[side] = min(min_insets[side], v)
-        # 규격보다 커서 여백을 이미 포함한 파일은 완화 기준, 그 외는 3mm 기준
-        floor = INTENTIONAL_BLEED_MIN_MM if order_derived else REQUIRED_MM - TOLERANCE_MM
-        if min(insets_mm.values()) + _EPS < floor:
+        if page_min + _EPS < floor_mm:
             bad_pages.append(i)
 
     if len(no_media_pages) == page_count:
@@ -149,7 +154,7 @@ def _measure(ctx: CheckContext) -> CheckResult:
         return result(
             "bleed",
             CheckStatus.UNCERTAIN,
-            required={"min_mm": REQUIRED_MM},
+            required={"min_mm": required_mm},
             pages=no_media_pages,
             detail=f"일부 페이지의 MediaBox 해석 불가 (pages={no_media_pages}) — 재단여백 판단 불가",
         )
@@ -161,7 +166,7 @@ def _measure(ctx: CheckContext) -> CheckResult:
     if order_bleed_pages:
         # 규격보다 큰 파일 = 재단여백을 이미 포함 (검판원·UI가 긍정적으로 표시하게)
         measured["includes_bleed"] = True
-    required = {"min_mm": REQUIRED_MM}
+    required = {"min_mm": required_mm}
 
     notes: list[str] = []
     if order_bleed_pages:
@@ -177,7 +182,7 @@ def _measure(ctx: CheckContext) -> CheckResult:
         "방향별 최소 여백(mm, 전 페이지 기준): "
         + ", ".join(f"{s}={measured['insets_mm'][s]}" for s in _SIDES)
     )
-    notes.append(f"기준 {REQUIRED_MM}mm (허용오차 -{TOLERANCE_MM}mm)")
+    notes.append(f"기준 {required_mm:g}mm (허용오차 -{TOLERANCE_MM}mm)")
 
     if not bad_pages:
         return result(
@@ -199,8 +204,8 @@ def _measure(ctx: CheckContext) -> CheckResult:
             fix_id="extend_bleed",
             note=(
                 "페이지를 래스터화한 뒤 가장자리 픽셀을 바깥으로 복제(edge replicate)해 "
-                "사방 3mm 재단여백을 만든다. 재단선 안쪽 디자인은 그대로 유지되어 "
-                "육안 차이가 없다."
+                f"품목 기준({required_mm:g}mm) 재단여백을 만든다. 재단선 안쪽 디자인은 "
+                "그대로 유지되어 육안 차이가 없다."
             ),
         ),
         detail="; ".join(notes),
