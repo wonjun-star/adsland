@@ -655,6 +655,62 @@ textarea {
   transform: scale(0.96);
 }
 
+/* 질문별 선택 그룹 (사이즈·수량 등 각각 버튼) */
+.quick-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.quick-q {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.quick-q-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+/* '기타 · 직접 입력' — 점선 테두리로 자유 입력임을 구분 */
+.chip.other {
+  color: var(--muted);
+  border-style: dashed;
+  font-weight: 600;
+}
+
+.chip.other:hover {
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  background: transparent;
+}
+
+/* 견적 카드 제작 기간 */
+.quote-lead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.quote-lead svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+  flex: none;
+}
+
+.quote-lead strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 /* ---------------------------------------------------------------- 카드 공통 */
 
 .cards {

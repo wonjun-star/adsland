@@ -62,6 +62,11 @@ class AutofixBody(BaseModel):
     check_id: str
 
 
+class SelectBody(BaseModel):
+    slot: str
+    value: object
+
+
 class DesignBody(BaseModel):
     template: str | None = None
     fields: dict | None = None
@@ -153,14 +158,25 @@ def _publish_cards(cards: list[dict]) -> list[dict]:
 
 
 def _turn_response(result: TurnResult, reply: str, extra_cards: list[dict] | None = None) -> dict:
-    """공통 응답 형태 {session, reply, cards} (docs/API.md)."""
-    quick_options: list = []
-    if result.directives.questions:
-        quick_options = list(result.directives.questions[0].quick_options)
+    """공통 응답 형태 {session, reply, cards} (docs/API.md).
+
+    reply.questions: 대기 중인 질문마다 선택지(options)를 담아 UI가 클릭 버튼으로 보여준다.
+    reply.quick_options: 첫 질문 옵션 (구버전 호환).
+    """
+    questions = [
+        {
+            "slot": q.slot,
+            "label": q.display_name or q.slot,
+            "options": list(q.options or q.quick_options),
+            "allow_other": q.allow_other,
+        }
+        for q in result.directives.questions
+    ]
+    quick_options = list(questions[0]["options"]) if questions else []
     cards = _publish_cards(result.cards) + list(extra_cards or [])
     return {
         "session": result.session.model_dump(mode="json"),
-        "reply": {"text": reply, "quick_options": quick_options},
+        "reply": {"text": reply, "quick_options": quick_options, "questions": questions},
         "cards": cards,
     }
 
@@ -323,6 +339,12 @@ def create_app() -> FastAPI:
         result, reply = run_or_404(
             pipeline.process_design, session_id, body.template, body.fields
         )
+        return _turn_response(result, reply)
+
+    @app.post("/api/session/{session_id}/select")
+    def post_select(session_id: str, body: SelectBody):
+        """질문 옵션 버튼 클릭 → 슬롯 직접 설정."""
+        result, reply = run_or_404(pipeline.process_select, session_id, body.slot, body.value)
         return _turn_response(result, reply)
 
     @app.post("/api/session/{session_id}/confirm")

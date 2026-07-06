@@ -215,6 +215,32 @@ class IntakeService:
 
         return self._advance(session_id, notices=notices, negative_sentiment=negative)
 
+    def select_option(self, session_id: str, slot: str, value: Any) -> TurnResult:
+        """질문 옵션 버튼 클릭 → 해당 슬롯을 바로 설정 (자유 입력 NLU 우회, 정확).
+
+        '기타'로 자유 입력하면 apply_turn(NLU)이 처리하고, 목록 클릭은 이 경로로 온다.
+        """
+        self.store.increment_turn(session_id)
+        row = self._get(session_id)
+        if not row.product:
+            return self._advance(session_id, notices=["slots_before_product"])
+        schema = self.catalog[row.product]
+        ok, resolved = self._validate_slot_value(schema, slot, value)
+        if not ok:
+            return self._advance(session_id, notices=[f"invalid_value:{slot}={value}"])
+
+        before = (row.slots or {}).get(slot, {}).get("value")
+        self.store.set_slot(session_id, slot, resolved, source="user")
+
+        # 재단 형태·크기·인쇄면이 바뀌면 파일 재검판 (칼선 판정 등 즉시 갱신)
+        row = self._get(session_id)
+        if slot in ("size", "sides", "cut_type") and before != resolved and row.file_path:
+            if State(row.state) == State.SLOT_FILLING:
+                self.store.transition(session_id, State.FILE_CHECK, "select_recheck")
+                self._run_preflight(session_id)
+                self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
+        return self._advance(session_id)
+
     def handle_upload(self, session_id: str, src_path: str | Path, original_name: str = "") -> TurnResult:
         """PDF 업로드 → 보관 → (가능하면) FILE_CHECK 전이 → 프리플라이트 → 정책 재평가."""
         self.store.increment_turn(session_id)
@@ -900,7 +926,8 @@ class IntakeService:
                         slot="sides",
                         display_name=sides_def.display_name or "인쇄면",
                         reason="confirm_back_side",
-                        quick_options=["단면", "양면"],
+                        options=["single", "double"],  # UI가 단면/양면으로 라벨링
+                        allow_other=False,
                     ),
                 )
                 d.offer_back_side = True
@@ -1023,7 +1050,8 @@ class IntakeService:
             )
         if d.quote is not None and not d.quote.missing:
             cards.append({"type": "quote", "estimate": d.estimate, **d.quote.model_dump(mode="json")})
-        if d.changes:
+        # 변경 내역 카드는 보정 직후·최종 확정 때만 (매 턴 반복 노출 방지)
+        if d.changes and (d.kind == "autofix" or d.awaiting_confirm):
             cards.append(
                 {
                     "type": "change_summary",

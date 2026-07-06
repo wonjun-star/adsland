@@ -53,10 +53,25 @@ class QuoteResult(BaseModel):
     total: int = 0             # supply_amount + vat (VAT 포함)
     lines: list[QuoteLine] = Field(default_factory=list)
     missing: list[str] = Field(default_factory=list)  # 조회 실패 축. 예: ["size=75x75"]
+    lead_time: str = ""        # 제작(발주) 기간, 영업일 (예: "2~3")
 
     @property
     def ok(self) -> bool:
         return not self.missing
+
+
+#: 상품별 제작(발주) 기간 — 영업일 기준 근사치 (애즈랜드 출고 안내 참고, 데모용).
+LEAD_TIME_DAYS: dict[str, str] = {
+    "namecard": "2~3",
+    "sticker": "3~4",
+    "flyer": "2~3",
+    "poster": "2~3",
+    "label": "4~5",
+    "postcard": "2~3",
+    "memopad": "3~4",
+    "photocard": "3~4",
+    "banner": "1~2",
+}
 
 
 @lru_cache(maxsize=8)
@@ -161,4 +176,5 @@ def quote(
         vat=vat,
         total=supply + vat,
         lines=lines,
+        lead_time=LEAD_TIME_DAYS.get(product, ""),
     )

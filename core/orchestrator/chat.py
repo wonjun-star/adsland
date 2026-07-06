@@ -166,6 +166,11 @@ class ChatPipeline:
         result = self.service.confirm(session_id)
         return result, self._render(result, self.adapter_provider())
 
+    def process_select(self, session_id: str, slot: str, value) -> tuple[TurnResult, str]:
+        """질문 옵션 버튼 클릭 → 슬롯 직접 설정."""
+        result = self.service.select_option(session_id, slot, value)
+        return result, self._render(result, self.adapter_provider())
+
     # ------------------------------------------------------------ 내부
 
     def _propose(

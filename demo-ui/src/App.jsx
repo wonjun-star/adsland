@@ -38,6 +38,7 @@ export default function App() {
         role: 'assistant',
         text: data.reply?.text || '',
         quickOptions: data.reply?.quick_options || [],
+        questions: data.reply?.questions || [],
         cards: data.cards || [],
       })
     },
@@ -138,6 +139,15 @@ export default function App() {
     [session, busy, push, runTurn],
   )
 
+  const selectOption = useCallback(
+    (slot, value, label) => {
+      if (!session || busy) return
+      push({ role: 'user', text: label ?? String(value) })
+      runTurn(() => api(`/api/session/${session.id}/select`, { method: 'POST', body: { slot, value } }))
+    },
+    [session, busy, push, runTurn],
+  )
+
   const confirmOrder = useCallback(() => {
     if (!session || busy) return
     push({ role: 'user', text: '네, 이대로 확정할게요.' })
@@ -210,6 +220,7 @@ export default function App() {
             busy={busy}
             session={session}
             onSend={sendMessage}
+            onSelect={selectOption}
             onUpload={uploadFile}
             onAutofix={applyAutofix}
             onDesign={applyDesign}

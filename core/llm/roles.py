@@ -226,13 +226,32 @@ def _fmt_size_part(s: str) -> str:
     return str(int(f)) if f == int(f) else f"{f:g}"
 
 
-def _extract_size(text: str) -> tuple[str | None, str]:
-    """(a) 사이즈 패턴을 먼저 추출하고, 남은 텍스트를 돌려준다 (수량 오인 방지)."""
+#: 넉넉한 사이즈 표현 — 구분자로 x·×·*·/·-·공백 허용 ("90 50", "90x50", "90 x 50", "90*50")
+_SIZE_LOOSE_RE = re.compile(r"(\d{2,4}(?:\.\d+)?)\s*(?:[xX×*/\-]|\s)\s*(\d{2,4}(?:\.\d+)?)")
+
+
+def _extract_size(text: str, schema: ProductSchema | None = None) -> tuple[str | None, str]:
+    """(a) 사이즈 추출 — 사람이 쓰는 여러 표현을 이해한다.
+
+    'x'류 구분자는 그대로, 공백 구분("90 50")은 스키마 사이즈 목록에 있을 때만 인정한다
+    (그래야 수량 두 개 같은 오탐을 막는다).
+    """
+    # 1) 명시적 구분자(x·×·*)가 있으면 바로
     m = _SIZE_RE.search(text)
-    if m is None:
-        return None, text
-    value = f"{_fmt_size_part(m.group(1))}x{_fmt_size_part(m.group(2))}"
-    return value, text[: m.start()] + " " + text[m.end() :]
+    if m is not None:
+        value = f"{_fmt_size_part(m.group(1))}x{_fmt_size_part(m.group(2))}"
+        return value, text[: m.start()] + " " + text[m.end() :]
+
+    # 2) 공백 등 느슨한 구분 — 스키마 사이즈 목록(choices)과 대조해 확정된 것만 인정
+    size_def = schema.slots.get("size") if schema else None
+    choices = {str(c) for c in (size_def.choices if size_def else [])}
+    if choices:
+        for mm in _SIZE_LOOSE_RE.finditer(text):
+            a, b = _fmt_size_part(mm.group(1)), _fmt_size_part(mm.group(2))
+            for cand in (f"{a}x{b}", f"{b}x{a}"):
+                if cand in choices:
+                    return cand, text[: mm.start()] + " " + text[mm.end() :]
+    return None, text
 
 
 def _extract_quantity(text: str) -> int | None:
@@ -309,7 +328,7 @@ def _rule_parse(text: str, schema: ProductSchema | None, awaiting_confirm: bool)
     signals = ["rule_fallback"]
     slots: dict[str, Any] = {}
 
-    size, rest = _extract_size(text)
+    size, rest = _extract_size(text, schema)
     if size is not None and (schema is None or "size" in schema.slots):
         slots["size"] = size
         signals.append(f"size_pattern:{size}")
@@ -1120,10 +1139,11 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
     if d.changes and d.kind == "autofix":
         parts.append(_changes_line(d.changes))
 
-    # 예상/확정 견적 — 한 줄 (항상 가격 먼저)
+    # 예상/확정 견적 — 한 줄 (항상 가격 먼저), 제작 기간 함께
     if d.quote is not None and not d.quote.missing:
         prefix = "예상 견적" if d.estimate else "견적"
-        parts.append(f"{prefix} {_won(d.quote.total)} (부가세 포함).")
+        lt = f" · 제작 {d.quote.lead_time}일" if getattr(d.quote, "lead_time", "") else ""
+        parts.append(f"{prefix} {_won(d.quote.total)}{lt} (부가세 포함).")
 
     # 충돌 확인 (간결)
     for c in d.conflicts:

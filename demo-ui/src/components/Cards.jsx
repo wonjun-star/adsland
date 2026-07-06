@@ -151,6 +151,13 @@ function QuoteCard({ card }) {
         </span>
       </div>
 
+      {card.lead_time && (
+        <div className="quote-lead">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M10 6v4.2l2.8 1.8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          제작 기간 <strong>영업일 {card.lead_time}일</strong>
+        </div>
+      )}
+
       {estimate && <p className="estimate-note">사양이 확정되면 정확한 금액으로 업데이트돼요.</p>}
 
       {hasBreakdown && (

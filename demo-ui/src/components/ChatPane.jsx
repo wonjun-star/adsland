@@ -1,9 +1,10 @@
 // 접수 대화 영역: 말풍선, 결과 카드, 빠른 선택 버튼, 확정 바, 입력창, PDF 드래그&드롭.
 
 import { useEffect, useRef, useState } from 'react'
+import { slotValueLabel } from '../labels'
 import TurnCards from './Cards'
 
-function Message({ msg, latest, busy, onQuick, onAutofix, onDesign }) {
+function Message({ msg, latest, busy, onSelect, onOther, onAutofix, onDesign }) {
   if (msg.role === 'system') {
     return <div className="msg-system">{msg.text}</div>
   }
@@ -25,12 +26,29 @@ function Message({ msg, latest, busy, onQuick, onAutofix, onDesign }) {
       <div className="msg-body">
         {msg.text && <div className="bubble assistant">{msg.text}</div>}
         <TurnCards cards={msg.cards} latest={latest} busy={busy} onAutofix={onAutofix} onDesign={onDesign} />
-        {latest && !busy && msg.quickOptions?.length > 0 && (
-          <div className="quick-options">
-            {msg.quickOptions.map((opt, i) => (
-              <button key={i} type="button" className="chip" onClick={() => onQuick(String(opt))}>
-                {String(opt)}
-              </button>
+        {latest && !busy && msg.questions?.length > 0 && (
+          <div className="quick-questions">
+            {msg.questions.map((q) => (
+              <div key={q.slot} className="quick-q">
+                {msg.questions.length > 1 && <span className="quick-q-label">{q.label}</span>}
+                <div className="quick-options">
+                  {(q.options || []).map((opt, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="chip"
+                      onClick={() => onSelect(q.slot, opt, slotValueLabel(q.slot, opt))}
+                    >
+                      {slotValueLabel(q.slot, opt)}
+                    </button>
+                  ))}
+                  {q.allow_other && (
+                    <button type="button" className="chip other" onClick={onOther}>
+                      기타 · 직접 입력
+                    </button>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -39,12 +57,15 @@ function Message({ msg, latest, busy, onQuick, onAutofix, onDesign }) {
   )
 }
 
-export default function ChatPane({ messages, busy, session, onSend, onUpload, onAutofix, onDesign, onConfirm, onReject }) {
+export default function ChatPane({ messages, busy, session, onSend, onSelect, onUpload, onAutofix, onDesign, onConfirm, onReject }) {
   const [draft, setDraft] = useState('')
   const [dragging, setDragging] = useState(false)
   const endRef = useRef(null)
   const fileRef = useRef(null)
+  const composerRef = useRef(null)
   const dragDepth = useRef(0)
+
+  const focusComposer = () => composerRef.current?.focus()
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -106,7 +127,8 @@ export default function ChatPane({ messages, busy, session, onSend, onUpload, on
             msg={m}
             latest={m.id === lastAssistantId}
             busy={busy}
-            onQuick={onSend}
+            onSelect={onSelect}
+            onOther={focusComposer}
             onAutofix={onAutofix}
             onDesign={onDesign}
           />
@@ -157,6 +179,7 @@ export default function ChatPane({ messages, busy, session, onSend, onUpload, on
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M14.5 8.5l-5.2 5.2a2.5 2.5 0 01-3.5-3.5l6-6a3.5 3.5 0 015 5l-6 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <textarea
+          ref={composerRef}
           rows={1}
           value={draft}
           disabled={!canSend}

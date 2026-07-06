@@ -50,12 +50,18 @@ BLOCK_ESCALATED = "escalated"
 
 
 class SlotQuestion(BaseModel):
-    """고객에게 물어야 하는 슬롯 1개. LLM이 이걸 자연어 질문으로 번역한다."""
+    """고객에게 물어야 하는 슬롯 1개. LLM이 이걸 자연어 질문으로 번역한다.
+
+    options: 클릭으로 고를 수 있는 값 목록(원값). UI가 라벨을 붙여 버튼으로 보여준다.
+    allow_other: 목록에 없으면 '기타(직접 입력)'로 자유 입력을 허용.
+    """
 
     slot: str
     display_name: str = ""
     reason: str = ""                                   # 질문이 발생한 규칙 (감사·eval용)
     quick_options: list[Any] = Field(default_factory=list)
+    options: list[Any] = Field(default_factory=list)   # 선택 버튼용 값 목록 (quick_options ∨ choices)
+    allow_other: bool = True                            # '기타' 직접 입력 허용
 
 
 class AutoFill(BaseModel):
@@ -159,12 +165,16 @@ def next_actions(
                 reason = "required_no_default"
             else:
                 reason = "required_default_high_risk"  # 틀리면 실물 파손 → 반드시 확정
+            # 선택 버튼용 옵션: quick_options 우선, 없으면 choices. 항상 '기타' 직접 입력 허용.
+            opts = list(sdef.quick_options) or list(sdef.choices)
             decision.questions.append(
                 SlotQuestion(
                     slot=name,
                     display_name=display,
                     reason=reason,
                     quick_options=list(sdef.quick_options),
+                    options=opts,
+                    allow_other=True,
                 )
             )
         # required 아니고 기본값도 없으면: 아무것도 하지 않는다 (선택 사양)
