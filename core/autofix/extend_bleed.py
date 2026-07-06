@@ -207,7 +207,9 @@ def extend_bleed(
             bleed_pt_px = bleed_px / _SCALE
             records.append(
                 {
-                    "cmyk": ext_img.convert("CMYK"),
+                    # 렌더한 RGB 그대로 보존 — 여백 연장이 색을 바꾸지 않게 (naive CMYK 변환 금지).
+                    # 색공간(CMYK 변환)은 별도 색상 항목이 색 관리와 함께 다룬다.
+                    "img": ext_img,
                     "captures": captures_per_page[i] if i < len(captures_per_page) else [],
                     "dx": bleed_pt_px - x0c,
                     "dy": bleed_pt_px - y0c,
@@ -263,7 +265,9 @@ def _write_cmyk_pdf(records: list[dict], bleed_px: int, out_path: Path) -> None:
     """
     pdf = pikepdf.new()
     for rec in records:
-        img: Image.Image = rec["cmyk"]
+        img: Image.Image = rec["img"]
+        if img.mode != "RGB":
+            img = img.convert("RGB")
         mw = img.width * 72.0 / DPI
         mh = img.height * 72.0 / DPI
         inset = bleed_px * 72.0 / DPI
@@ -274,7 +278,7 @@ def _write_cmyk_pdf(records: list[dict], bleed_px: int, out_path: Path) -> None:
             Subtype=pikepdf.Name.Image,
             Width=img.width,
             Height=img.height,
-            ColorSpace=pikepdf.Name.DeviceCMYK,
+            ColorSpace=pikepdf.Name.DeviceRGB,  # 렌더 색 그대로 — 여백 연장이 색을 바꾸지 않음
             BitsPerComponent=8,
             Filter=pikepdf.Name.FlateDecode,
         )
