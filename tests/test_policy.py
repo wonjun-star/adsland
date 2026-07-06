@@ -178,16 +178,13 @@ def test_no_signals_when_all_nominal():
     assert _signals() == []
 
 
-def test_turns_boundary():
-    assert _signals(turn_count=6) == []                      # 6회까지는 허용
-    assert SIG_TURNS_EXCEEDED in _signals(turn_count=7)      # >6회
+def test_slot_changes_do_not_escalate():
+    """사양을 여러 번 바꿔도 사람에게 넘기지 않는다 (정상 대화 — 챗봇처럼 끊지 않음)."""
+    assert _signals(slot_change_counts={"size": 5, "quantity": 3}) == []
 
 
-def test_slot_thrashing_two_or_more_changes():
-    assert _signals(slot_change_counts={"size": 1}) == []
-    sigs = _signals(slot_change_counts={"size": 2, "quantity": 0})
-    assert f"{SIG_SLOT_THRASHING}:size" in sigs
-    assert not any(s.endswith(":quantity") for s in sigs)
+def test_many_turns_do_not_escalate():
+    assert _signals(turn_count=30) == []
 
 
 def test_uncertain_in_report_signals():
@@ -216,8 +213,10 @@ def test_negative_sentiment_immediate():
 
 
 def test_multiple_signals_accumulate():
-    sigs = _signals(turn_count=10, negative_sentiment=True, quote_total=999_999)
-    assert {SIG_TURNS_EXCEEDED, SIG_NEGATIVE_SENTIMENT, SIG_HIGH_QUOTE} <= set(sigs)
+    # 진짜 필요한 신호만 누적: 부정 감정 + 고액. 왕복 수·슬롯 변경은 이제 신호 아님.
+    sigs = _signals(turn_count=30, negative_sentiment=True, quote_total=999_999)
+    assert {SIG_NEGATIVE_SENTIMENT, SIG_HIGH_QUOTE} <= set(sigs)
+    assert not any("turns" in s or "thrashing" in s for s in sigs)
 
 
 # ---------------------------------------------------------------- 3중 관문

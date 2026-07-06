@@ -1,6 +1,6 @@
 {
   "summary": {
-    "run_at": "2026-07-06T03:49:08.669348+00:00",
+    "run_at": "2026-07-06T08:49:07.727180+00:00",
     "mode": "rule",
     "total": 16,
     "passed": 16,
@@ -187,18 +187,16 @@
       "criticals": []
     },
     {
-      "id": "e3_slot_thrashing_escalates",
+      "id": "e3_spec_changes_stay_conversational",
       "type": "EDGE",
-      "description": "수량을 500→1000→300으로 두 번 번복하는 고객. 슬롯 흔들림 시그널로 사람에게 넘긴다.",
+      "description": "수량을 500→1000→300으로 두 번 바꾸는 고객. 그래도 담당자 넘기지 않고 계속 응대한다.",
       "passed": true,
       "final_state": "SLOT_FILLING",
       "expected_state": "SLOT_FILLING",
       "questions": 0,
       "max_questions": 2,
-      "escalated": true,
-      "escalation_reasons": [
-        "slot_thrashing:quantity"
-      ],
+      "escalated": false,
+      "escalation_reasons": [],
       "failures": [],
       "criticals": []
     },

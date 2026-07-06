@@ -200,14 +200,9 @@ def escalation_signals(
     """
     signals: list[str] = []
 
-    # 고객-AI 왕복 수 > 6회
-    if turn_count > MAX_TURNS:
-        signals.append(SIG_TURNS_EXCEEDED)
-
-    # 같은 슬롯 값이 왕복 간 2회 이상 변경 — 즉시
-    for slot, count in slot_change_counts.items():
-        if count >= SLOT_CHANGE_LIMIT:
-            signals.append(f"{SIG_SLOT_THRASHING}:{slot}")
+    # 대화가 길어지거나(왕복 많음) 사양을 여러 번 바꾸는 것은 '정상 대화'다 — 사람에게 넘기지 않는다.
+    # (예전엔 왕복>6, 같은 슬롯 2회 변경 시 에스컬레이션했으나, 대화를 끊어 챗봇처럼 느껴져 제거.)
+    # 사양 변경·대화 길이는 마찰이 아니라 상담의 일부다. 필요한 신호만 아래에서 본다.
 
     # 프리플라이트 uncertain 항목 존재 — 즉시.
     # 단, 고객 질문으로 풀리는 항목(dieline=재단 형태 선택)은 사람에게 넘기지 않는다.

@@ -113,7 +113,8 @@ def test_customer_type_c_escalates(svc):
     assert any("customer_type_C" in x for x in r.directives.escalation_reasons)
 
 
-def test_slot_thrashing_escalates(svc):
+def test_repeated_spec_changes_do_not_escalate(svc):
+    """수량을 여러 번 바꿔도 담당자로 넘기지 않는다 — 마음 바꾸는 건 정상 대화."""
     r = svc.start()
     sid = r.session.id
     svc.apply_turn(
@@ -123,7 +124,8 @@ def test_slot_thrashing_escalates(svc):
     )
     svc.apply_turn(sid, proposal=SlotProposal(intent=Intent.CHANGE, slots={"quantity": 1000}))
     r = svc.apply_turn(sid, proposal=SlotProposal(intent=Intent.CHANGE, slots={"quantity": 300}))
-    assert any(x.startswith("slot_thrashing:quantity") for x in r.directives.escalation_reasons)
+    assert not r.session.escalated
+    assert not any("slot_thrashing" in x for x in r.directives.escalation_reasons)
 
 
 def test_invalid_slot_value_rejected(svc):
