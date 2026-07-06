@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import { api, ApiError, designTemplate } from './api'
+import { slotLabel } from './labels'
 import AccessGate from './components/AccessGate'
 import BoardPanel from './components/BoardPanel'
 import ChatPane from './components/ChatPane'
@@ -192,9 +193,15 @@ export default function App() {
     runTurn(() => api(`/api/session/${session.id}/confirm`, { method: 'POST' }))
   }, [session, busy, push, runTurn])
 
-  const rejectConfirm = useCallback(() => {
-    sendMessage('확정 전에 사양을 조금 바꾸고 싶어요.')
-  }, [sendMessage])
+  // 최종 확인 카드에서 '바꾸기' → 그 항목을 다시 고르게 (선택지 버튼을 띄운다)
+  const reopenSlot = useCallback(
+    (slot) => {
+      if (!session || busy) return
+      push({ role: 'user', text: `${slotLabel(slot)} 바꿀래요.` })
+      runTurn(() => api(`/api/session/${session.id}/reopen`, { method: 'POST', body: { slot } }))
+    },
+    [session, busy, push, runTurn],
+  )
 
   if (locked === null) {
     return <div className="boot">접속 확인 중…</div>
@@ -263,8 +270,8 @@ export default function App() {
             onUpload={uploadFiles}
             onAutofix={applyAutofix}
             onDesign={applyDesign}
+            onReopen={reopenSlot}
             onConfirm={confirmOrder}
-            onReject={rejectConfirm}
           />
           <SidePanel session={session} />
         </div>

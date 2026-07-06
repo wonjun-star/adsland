@@ -63,7 +63,7 @@ function QuickQuestions({ questions, onSelect, onSelectMany, onOther }) {
   )
 }
 
-function Message({ msg, latest, busy, onSelect, onSelectMany, onOther, onAutofix, onDesign }) {
+function Message({ msg, latest, busy, onSelect, onSelectMany, onOther, onAutofix, onDesign, onReopen, onConfirm }) {
   if (msg.role === 'system') {
     return <div className="msg-system">{msg.text}</div>
   }
@@ -84,7 +84,15 @@ function Message({ msg, latest, busy, onSelect, onSelectMany, onOther, onAutofix
       <div className="avatar" aria-hidden="true">AI</div>
       <div className="msg-body">
         {msg.text && <div className="bubble assistant">{msg.text}</div>}
-        <TurnCards cards={msg.cards} latest={latest} busy={busy} onAutofix={onAutofix} onDesign={onDesign} />
+        <TurnCards
+          cards={msg.cards}
+          latest={latest}
+          busy={busy}
+          onAutofix={onAutofix}
+          onDesign={onDesign}
+          onReopen={onReopen}
+          onConfirm={onConfirm}
+        />
         {latest && !busy && msg.questions?.length > 0 && (
           <QuickQuestions
             questions={msg.questions}
@@ -98,7 +106,7 @@ function Message({ msg, latest, busy, onSelect, onSelectMany, onOther, onAutofix
   )
 }
 
-export default function ChatPane({ messages, busy, session, onSend, onSelect, onSelectMany, onUpload, onAutofix, onDesign, onConfirm, onReject }) {
+export default function ChatPane({ messages, busy, session, onSend, onSelect, onSelectMany, onUpload, onAutofix, onDesign, onReopen, onConfirm }) {
   const [draft, setDraft] = useState('')
   const [dragging, setDragging] = useState(false)
   const endRef = useRef(null)
@@ -113,7 +121,6 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
   }, [messages, busy])
 
   const completed = session?.state === 'COMPLETED'
-  const awaiting = session?.state === 'PROOF_CONFIRM'
   const canSend = Boolean(session) && !busy && !completed
 
   const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id
@@ -173,6 +180,8 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
             onOther={focusComposer}
             onAutofix={onAutofix}
             onDesign={onDesign}
+            onReopen={onReopen}
+            onConfirm={onConfirm}
           />
         ))}
         {busy && (
@@ -185,19 +194,6 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
         )}
         <div ref={endRef} />
       </div>
-
-      {awaiting && !busy && (
-        <div className="confirm-bar">
-          <div className="confirm-copy">
-            <strong>사양·검판·견적이 모두 준비됐어요.</strong>
-            <span>확정하면 이 사양 그대로 제작이 시작돼요.</span>
-          </div>
-          <div className="confirm-actions">
-            <button type="button" className="btn ghost" onClick={onReject}>더 수정할게요</button>
-            <button type="button" className="btn primary" onClick={onConfirm}>이대로 확정하기</button>
-          </div>
-        </div>
-      )}
 
       <div className="composer">
         <input

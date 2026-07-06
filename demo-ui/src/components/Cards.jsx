@@ -312,6 +312,43 @@ function EscalationCard({ card }) {
   )
 }
 
+// 최종 확인 (맥도날드 키오스크식) — 각 항목 훑고, 틀린 건 '바꾸기', 다 맞으면 '이대로 주문'.
+function ConfirmReviewCard({ card, latest, busy, onReopen, onConfirm }) {
+  const specs = card.specs || []
+  const disabled = busy || !latest
+  return (
+    <div className="card confirm-review">
+      <div className="card-title">
+        주문 확인
+        <span className="card-title-sub">확정 전에 한 번만 봐주세요</span>
+      </div>
+      <ul className="review-list">
+        {specs.map((s) => (
+          <li key={s.slot} className="review-row">
+            <span className="review-check" aria-hidden="true">
+              <svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </span>
+            <span className="review-label">{s.label}</span>
+            <span className="review-value">{s.value_label}</span>
+            <button type="button" className="review-change" disabled={disabled} onClick={() => onReopen?.(s.slot)}>
+              바꾸기
+            </button>
+          </li>
+        ))}
+      </ul>
+      {card.total !== null && card.total !== undefined && (
+        <div className="review-total">
+          <span>{card.estimate ? '예상 결제 금액' : '결제 금액'}</span>
+          <strong>{money(card.total)}</strong>
+        </div>
+      )}
+      <button type="button" className="btn primary review-confirm" disabled={disabled} onClick={onConfirm}>
+        다 맞아요 · 이대로 주문
+      </button>
+    </div>
+  )
+}
+
 function OrderConfirmedCard({ card }) {
   const summary = card.summary || {}
   const slots = summary.slots || {}
@@ -458,7 +495,7 @@ function DesignPreviewCard({ card, latest, busy, onDesign }) {
   )
 }
 
-function Card({ card, latest, busy, onAutofix, onDesign }) {
+function Card({ card, latest, busy, onAutofix, onDesign, onReopen, onConfirm }) {
   switch (card.type) {
     case 'preflight_report':
       return <PreflightCard card={card} latest={latest} busy={busy} onAutofix={onAutofix} />
@@ -472,6 +509,8 @@ function Card({ card, latest, busy, onAutofix, onDesign }) {
       return <FilePreviewCard card={card} />
     case 'design_preview':
       return <DesignPreviewCard card={card} latest={latest} busy={busy} onDesign={onDesign} />
+    case 'confirm_review':
+      return <ConfirmReviewCard card={card} latest={latest} busy={busy} onReopen={onReopen} onConfirm={onConfirm} />
     case 'escalation':
       return <EscalationCard card={card} />
     case 'order_confirmed':
@@ -481,12 +520,21 @@ function Card({ card, latest, busy, onAutofix, onDesign }) {
   }
 }
 
-export default function TurnCards({ cards, latest, busy, onAutofix, onDesign }) {
+export default function TurnCards({ cards, latest, busy, onAutofix, onDesign, onReopen, onConfirm }) {
   if (!cards || cards.length === 0) return null
   return (
     <div className="cards">
       {cards.map((card, i) => (
-        <Card key={i} card={card} latest={latest} busy={busy} onAutofix={onAutofix} onDesign={onDesign} />
+        <Card
+          key={i}
+          card={card}
+          latest={latest}
+          busy={busy}
+          onAutofix={onAutofix}
+          onDesign={onDesign}
+          onReopen={onReopen}
+          onConfirm={onConfirm}
+        />
       ))}
     </div>
   )

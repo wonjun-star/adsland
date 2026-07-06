@@ -56,6 +56,32 @@ def choice_to_mm(choice: str) -> tuple[float, float] | None:
         return None
 
 
+#: "○○ 뭐 있어?"에서 슬롯을 알아채는 키워드 (고객 언어 → 슬롯)
+_SLOT_ASK_KEYWORDS: dict[str, str] = {
+    "용지": "material", "종이": "material", "재질": "material",
+    "코팅": "coating", "라미네이팅": "coating",
+    "사이즈": "size", "크기": "size", "규격": "size",
+    "재단": "cut_type", "도무송": "cut_type", "칼선": "cut_type",
+    "후가공": "finishing",
+    "수량": "quantity", "매수": "quantity",
+}
+#: 옵션을 묻는 말투 (이게 있어야 '선택지 보여달라'는 뜻으로 본다)
+_OPTION_ASK_PHRASES = ("있어", "있나", "있을까", "있는", "종류", "뭐", "무슨", "어떤", "옵션", "골라", "선택", "뭔가")
+
+
+def _asked_options_slot(text: str, schema: ProductSchema | None) -> str | None:
+    """'용지 뭐 있어?'처럼 특정 슬롯의 선택지를 묻는 말이면 그 슬롯명을 돌려준다."""
+    if not text or schema is None:
+        return None
+    low = text.replace(" ", "")
+    if not any(p in low for p in _OPTION_ASK_PHRASES):
+        return None
+    for kw, slot in _SLOT_ASK_KEYWORDS.items():
+        if kw in low and slot in schema.slots and schema.slots[slot].choices:
+            return slot
+    return None
+
+
 def match_size_choice(schema: ProductSchema, w_mm: float, h_mm: float) -> str | None:
     """파일 재단 크기 → 카탈로그 사이즈 선택지 (회전 일치 포함, ±1mm)."""
     size_slot = schema.slots.get("size")
@@ -108,6 +134,8 @@ class ReplyDirectives(BaseModel):
     escalation_reasons: list[str] = Field(default_factory=list)
     order_no: str | None = None
     awaiting_confirm: bool = False
+    # 최종 확인 체크리스트 (맥도날드 키오스크식) — 각 항목 확인 후 '이대로 주문'
+    confirm_review: list[dict] = Field(default_factory=list)
     # 시안 생성 경로
     design_generated: bool = False           # 이번 턴에 시안을 새로 만들었는가
     design_template_name: str = ""           # 적용된 템플릿 표시명
@@ -120,6 +148,7 @@ class ReplyDirectives(BaseModel):
     offer_back_side: bool = False            # 앞면만 올린 명함류 → 뒷면(양면) 확인
     customer_question: str = ""              # 고객이 던진 질문 (용지·사이즈·가격 등) → 답해야 함
     customer_message: str = ""               # 고객이 방금 한 말 원문 (LLM이 의도 파악에 사용)
+    asked_slot: str = ""                      # 고객이 "뭐 있어?"로 물은 슬롯 → 그 선택지를 버튼으로
     # 옵션별 실제 계산 가격 (지어내지 않게 미리 산출) — {슬롯: {"unit","quantity","choices":[{value,total}]}}
     option_prices: dict[str, Any] = Field(default_factory=dict)
 
@@ -150,6 +179,7 @@ class IntakeService:
         session_id: str,
         classify: ClassifyProposal | None = None,
         proposal: SlotProposal | None = None,
+        customer_text: str = "",
     ) -> TurnResult:
         """대화 1턴 적용. 제안(classify/proposal)은 이미 pydantic 검증을 통과한 것."""
         self.store.increment_turn(session_id)
@@ -217,7 +247,9 @@ class IntakeService:
         if wants_confirm and State(row.state) == State.PROOF_CONFIRM:
             return self.confirm(session_id)
 
-        return self._advance(session_id, notices=notices, negative_sentiment=negative)
+        return self._advance(
+            session_id, notices=notices, negative_sentiment=negative, customer_text=customer_text
+        )
 
     def select_option(self, session_id: str, slot: str, value: Any) -> TurnResult:
         """질문 옵션 버튼 클릭 → 해당 슬롯을 바로 설정 (자유 입력 NLU 우회, 정확).
@@ -244,6 +276,32 @@ class IntakeService:
                 self._run_preflight(session_id)
                 self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
         return self._advance(session_id)
+
+    def reopen_slot(self, session_id: str, slot: str) -> TurnResult:
+        """최종 확인에서 '바꾸기' 누른 항목을 다시 고르게 — 그 슬롯 선택지를 버튼으로 띄운다."""
+        row = self._get(session_id)
+        if not row.product:
+            return self._advance(session_id)
+        schema = self.catalog[row.product]
+        sdef = schema.slots.get(slot)
+        if sdef is None or not sdef.choices:
+            return self._advance(session_id)
+        opts = list(sdef.quick_options) or list(sdef.choices)
+        d = ReplyDirectives(
+            kind="turn",
+            asked_slot=slot,
+            questions=[
+                SlotQuestion(
+                    slot=slot,
+                    display_name=sdef.display_name or slot,
+                    reason="reopen_from_confirm",
+                    quick_options=list(sdef.quick_options),
+                    options=opts,
+                    allow_other=True,
+                )
+            ],
+        )
+        return TurnResult(session=self._view(row), directives=d, cards=self._cards(d, row))
 
     def handle_upload(self, session_id: str, src_path: str | Path, original_name: str = "") -> TurnResult:
         """PDF 업로드 → 보관 → (가능하면) FILE_CHECK 전이 → 프리플라이트 → 정책 재평가."""
@@ -1036,10 +1094,11 @@ class IntakeService:
         negative_sentiment: bool = False,
         kind: str = "turn",
         report: PreflightReport | None = None,
+        customer_text: str = "",
     ) -> TurnResult:
         """턴 마무리 공통 파이프라인: 추론 반영 → 질문 정책 → 견적 → 시그널 → 전이 → 지시서."""
         row = self._get(session_id)
-        d = ReplyDirectives(kind=kind, notices=list(notices or []))
+        d = ReplyDirectives(kind=kind, notices=list(notices or []), customer_message=customer_text)
 
         if report is None:
             report = self._latest_report(session_id)
@@ -1066,6 +1125,26 @@ class IntakeService:
         decision = policy.next_actions(schema, row.slots or {}, inferred, report)
         d.questions = decision.questions
         d.conflicts = decision.conflicts
+
+        # 고객이 "용지 뭐 있어?"처럼 옵션을 물으면, 그 슬롯을 버튼으로 띄운다 (사람이 고르게).
+        # 기본값이 있어 평소엔 질문 안 하는 슬롯도 이때는 선택지를 보여준다.
+        asked = _asked_options_slot(customer_text, schema)
+        if asked:
+            d.asked_slot = asked
+            if not any(q.slot == asked for q in d.questions):
+                sdef = schema.slots[asked]
+                opts = list(sdef.quick_options) or list(sdef.choices)
+                d.questions.insert(
+                    0,
+                    SlotQuestion(
+                        slot=asked,
+                        display_name=sdef.display_name or asked,
+                        reason="customer_asked_options",
+                        quick_options=list(sdef.quick_options),
+                        options=opts,
+                        allow_other=True,
+                    ),
+                )
 
         # 자동 채움 적용 + 통보
         for af in decision.auto_filled:
@@ -1225,6 +1304,7 @@ class IntakeService:
             if ready:
                 row = self.store.transition(session_id, State.PROOF_CONFIRM, "all_slots_and_checks_ok")
                 d.awaiting_confirm = True
+                d.confirm_review = self._confirm_specs(row, schema)
             elif needs_back:
                 d.request_file = True  # 양면인데 앞면만 → 뒷면 파일 요청
             elif not row.file_path:
@@ -1236,11 +1316,28 @@ class IntakeService:
         elif state == State.PROOF_CONFIRM:
             if ready:
                 d.awaiting_confirm = True
+                d.confirm_review = self._confirm_specs(row, schema)
             else:
                 # 확정 단계에서 조건이 깨졌으면 슬롯 수집으로 복귀
                 row = self.store.transition(session_id, State.SLOT_FILLING, "proof_conditions_broken")
 
         return TurnResult(session=self._view(row), directives=d, cards=self._cards(d, row))
+
+    def _confirm_specs(self, row: OrderSession, schema: ProductSchema) -> list[dict]:
+        """최종 확인용 사양 체크리스트 — 값은 고객 언어 라벨로. 확정 직전에 한 번 훑게 한다."""
+        from core.llm.roles import label_value  # 스펙 값 → 고객 언어 (예: die_cut → 도무송)
+
+        specs: list[dict] = []
+        for name, sd in schema.slots.items():
+            v = (row.slots or {}).get(name, {}).get("value")
+            if v is None:
+                continue
+            unit = sd.unit or ""
+            value_label = label_value(name, v)
+            if unit and value_label == str(v):  # 숫자값이면 단위를 붙여 읽기 쉽게 (200장)
+                value_label = f"{value_label}{unit}"
+            specs.append({"slot": name, "label": sd.display_name or name, "value_label": value_label})
+        return specs
 
     def _cards(self, d: ReplyDirectives, row: OrderSession) -> list[dict]:
         """directives → UI 카드 목록 (docs/API.md 계약)."""
@@ -1262,6 +1359,16 @@ class IntakeService:
             )
         if d.quote is not None and not d.quote.missing:
             cards.append({"type": "quote", "estimate": d.estimate, **d.quote.model_dump(mode="json")})
+        # 최종 확인 체크리스트 (맥도날드 키오스크식) — 확정 직전에 사양을 한 번 훑고 진행
+        if d.confirm_review:
+            cards.append(
+                {
+                    "type": "confirm_review",
+                    "specs": d.confirm_review,
+                    "total": d.quote.total if (d.quote and not d.quote.missing) else None,
+                    "estimate": d.estimate,
+                }
+            )
         # 변경 내역 카드는 보정 직후·최종 확정 때만 (매 턴 반복 노출 방지)
         if d.changes and (d.kind == "autofix" or d.awaiting_confirm):
             cards.append(

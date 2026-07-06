@@ -67,6 +67,10 @@ class SelectBody(BaseModel):
     value: object
 
 
+class ReopenBody(BaseModel):
+    slot: str
+
+
 class DesignBody(BaseModel):
     template: str | None = None
     fields: dict | None = None
@@ -380,6 +384,12 @@ def create_app() -> FastAPI:
     def post_select(session_id: str, body: SelectBody):
         """질문 옵션 버튼 클릭 → 슬롯 직접 설정."""
         result, reply = run_or_404(pipeline.process_select, session_id, body.slot, body.value)
+        return _turn_response(result, reply)
+
+    @app.post("/api/session/{session_id}/reopen")
+    def post_reopen(session_id: str, body: ReopenBody):
+        """최종 확인 카드에서 특정 항목 '바꾸기' → 그 슬롯을 다시 고르게 띄운다."""
+        result, reply = run_or_404(pipeline.process_reopen, session_id, body.slot)
         return _turn_response(result, reply)
 
     @app.post("/api/session/{session_id}/confirm")

@@ -1506,6 +1506,108 @@ textarea {
 
 /* ---------------------------------------------------------------- 확정 바 */
 
+/* 최종 확인 카드 (맥도날드 키오스크식 체크리스트) */
+.card.confirm-review {
+  border: 1.5px solid var(--accent);
+}
+
+.review-list {
+  list-style: none;
+  margin: 10px 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.review-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.review-row:last-child {
+  border-bottom: none;
+}
+
+.review-check {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+
+.review-check svg {
+  width: 12px;
+  height: 12px;
+}
+
+.review-label {
+  font-size: 13.5px;
+  color: var(--muted);
+  min-width: 68px;
+}
+
+.review-value {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.review-change {
+  flex: none;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--muted);
+  border-radius: var(--r-pill);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.review-change:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.review-change:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.review-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 12px 0 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.review-total strong {
+  font-size: 20px;
+  color: var(--accent-ink);
+}
+
+.review-confirm {
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px;
+  font-size: 15.5px;
+  font-weight: 700;
+}
+
 .confirm-bar {
   flex: none;
   margin: 0 24px 12px;

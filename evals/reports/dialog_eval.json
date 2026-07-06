@@ -1,6 +1,6 @@
 {
   "summary": {
-    "run_at": "2026-07-06T14:00:27.787673+00:00",
+    "run_at": "2026-07-06T14:22:10.122347+00:00",
     "mode": "rule",
     "total": 16,
     "passed": 16,
@@ -147,7 +147,7 @@
       "passed": true,
       "final_state": "SLOT_FILLING",
       "expected_state": "SLOT_FILLING",
-      "questions": 0,
+      "questions": 1,
       "max_questions": 2,
       "escalated": true,
       "escalation_reasons": [

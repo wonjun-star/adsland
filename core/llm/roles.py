@@ -665,6 +665,14 @@ def _label(value: Any) -> str:
     return VALUE_LABELS.get(str(value), str(value))
 
 
+def label_value(slot: str, value: Any) -> str:
+    """스펙 값 → 고객 언어 라벨 (슬롯 문맥 반영). 예: die_cut→도무송, 90x50→90×50mm."""
+    s = str(value)
+    if slot == "size" and "x" in s.lower():
+        return s.lower().replace("x", "×") + "mm"
+    return _label(value)
+
+
 def _slot_display(name: str, schema: ProductSchema | None) -> str:
     if schema is not None:
         sdef = schema.slots.get(name)
@@ -1207,6 +1215,38 @@ def _comparison_line(d: "ReplyDirectives", schema: ProductSchema | None) -> str 
     return f"{_fmt_num(info.get('quantity'))}{qunit} 기준 {disp}별 견적이에요 — {items} (부가세 포함)."
 
 
+#: 값마다 가격이 달라지는 게 보통인 슬롯 — 물어보면 '수량 정해주시면 각각 견적'으로 유도
+_PRICE_VARYING_SLOTS = frozenset({"material", "coating", "size", "finishing"})
+
+
+def _asked_options_answer(
+    d: "ReplyDirectives", view: "SessionView", schema: ProductSchema | None, slot: str
+) -> tuple[str | None, bool]:
+    """'용지 뭐 있어?'에 대한 답 + 수량을 유도했는지 여부.
+
+    수량을 알면 옵션별 실제 가격까지, 모르면 옵션을 알려주고 "수량 정해주시면 각각 견적"으로
+    자연스럽게 수량을 유도한다("몇 장?"만 툭 묻지 않게).
+    """
+    sdef = schema.slots.get(slot) if schema else None
+    if not sdef:
+        return None, False
+    disp = sdef.display_name or _slot_display(slot, schema)
+    qty = (view.slots or {}).get("quantity", {}).get("value")
+    info = (d.option_prices or {}).get(slot)
+    if qty and info:
+        qunit = schema.slots["quantity"].unit if "quantity" in schema.slots else "매"
+        items = ", ".join(f"{_label(c['value'])} {_won(c['total'])}" for c in info["choices"])
+        return f"{disp}는 {items}이에요 ({_fmt_num(qty)}{qunit} 기준, 부가세 포함). 원하시는 걸로 골라주세요.", False
+    opts = ", ".join(_label(c) for c in sdef.choices)
+    if slot in _PRICE_VARYING_SLOTS and not qty:
+        return (
+            f"{disp}는 {opts} 중에서 고르실 수 있어요. "
+            f"{disp}별로 가격이 다른데, 수량만 정해주시면 각각 맞춰 견적 내드릴게요.",
+            True,
+        )
+    return f"{disp}는 {opts} 중에서 고르실 수 있어요.", False
+
+
 def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchema | None) -> str:
     """결과 우선·최소 대화 템플릿 — 상세는 카드가, 말은 짧게.
 
@@ -1228,10 +1268,17 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
 
     parts: list[str] = []
 
+    asked = getattr(d, "asked_slot", "")
+    invited_quantity = False
     # 옵션별 비교 요청이면 실제 계산가 표를 먼저 보여준다 (지어내지 않음)
     comparison = _comparison_line(d, schema)
     if comparison:
         parts.append(comparison)
+    elif asked:
+        # "용지 뭐 있어?" → 선택지 안내(+가격 유도). 버튼은 화면에 따로 나온다.
+        ans, invited_quantity = _asked_options_answer(d, view, schema, asked)
+        if ans:
+            parts.append(ans)
     # 고객 질문에 먼저 답한다 (자기 흐름보다 우선)
     elif getattr(d, "customer_question", ""):
         ans = _answer_question(d.customer_question, schema, d)
@@ -1279,8 +1326,12 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
 
     # 남은 질문만 (자동 채운 값은 사이드 요약에 있으니 문장에서 반복하지 않음).
     # 여러 개면 한 문장으로 묶어 사람처럼 — 빠진 것만 콕 집어 묻는다.
+    # 이미 문장으로 안내한 슬롯(물어본 옵션·유도한 수량)은 버튼만 남기고 말은 반복하지 않는다.
+    suppress = {asked} if asked else set()
+    if invited_quantity:
+        suppress.add("quantity")
     back_side_qs = [q for q in d.questions if q.slot == "sides" and getattr(d, "offer_back_side", False)]
-    normal_qs = [q for q in d.questions if q not in back_side_qs]
+    normal_qs = [q for q in d.questions if q not in back_side_qs and q.slot not in suppress]
     for _q in back_side_qs:
         parts.append("앞면 확인했어요 — 단면으로 할까요, 양면으로 할까요? 양면이면 뒷면 파일도 올려주세요.")
     if len(normal_qs) == 1:
@@ -1289,7 +1340,7 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
         parts.append(_merged_question_line(normal_qs, schema))
 
     # 확정 단계 — 검토 → 최종본 → 진행. (단, 고객이 질문·비교를 요청한 턴엔 확정 재촉하지 않는다)
-    asked_something = bool(comparison) or bool(getattr(d, "customer_question", ""))
+    asked_something = bool(comparison) or bool(asked) or bool(getattr(d, "customer_question", ""))
     if d.awaiting_confirm and not asked_something:
         if d.changes:
             parts.append("검토 결과를 반영한 최종본이에요. 이대로 진행할까요?")

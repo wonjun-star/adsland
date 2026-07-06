@@ -98,10 +98,11 @@ class ChatPipeline:
             rule=lambda: roles.parse_slots(text, schema, None, awaiting_confirm=awaiting),
         )
 
-        result = self.service.apply_turn(session_id, classify=classify, proposal=proposal)
-        # 고객이 방금 한 말 원문을 항상 넘긴다 — 정해진 경로에 안 맞는 요청(옵션별 비교 등)도
-        # LLM이 의도를 읽고 응대하게. 가격 등 숫자는 directives 값(option_prices 포함)만 쓴다.
-        result.directives.customer_message = text
+        # 고객이 방금 한 말 원문을 서비스에 넘긴다 — 정해진 경로에 안 맞는 요청(옵션별 비교,
+        # "용지 뭐 있어?" 등)도 의도를 읽어 선택지·안내를 만든다. 숫자는 directives 값만 쓴다.
+        result = self.service.apply_turn(
+            session_id, classify=classify, proposal=proposal, customer_text=text
+        )
         # 명시적 질문이면(용지·사이즈·가격 등) '답 먼저' 흐름을 태운다
         if proposal is not None and proposal.intent == Intent.QUESTION:
             result.directives.customer_question = text
@@ -175,6 +176,11 @@ class ChatPipeline:
     def process_select(self, session_id: str, slot: str, value) -> tuple[TurnResult, str]:
         """질문 옵션 버튼 클릭 → 슬롯 직접 설정."""
         result = self.service.select_option(session_id, slot, value)
+        return result, self._render(result, self.adapter_provider())
+
+    def process_reopen(self, session_id: str, slot: str) -> tuple[TurnResult, str]:
+        """최종 확인에서 특정 항목 '바꾸기' → 그 슬롯을 다시 고르게 띄운다."""
+        result = self.service.reopen_slot(session_id, slot)
         return result, self._render(result, self.adapter_provider())
 
     # ------------------------------------------------------------ 내부
