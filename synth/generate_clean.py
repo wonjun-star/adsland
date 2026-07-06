@@ -69,8 +69,9 @@ class ProductSpec:
     dieline: bool  # CutContour 별색 칼선 포함 여부
 
 
-#: 상품 8종 기본 규격 (재단 크기 기준). 앞 5종은 eval 코퍼스 기준(CORE_PRODUCTS),
-#: 뒤 3종은 데모 쇼케이스용 신규 낱장 인쇄물(엽서·떡메모지·포토카드, 칼선 없음).
+#: 상품 9종 기본 규격 (재단 크기 기준). 앞 5종은 eval 코퍼스 기준(CORE_PRODUCTS),
+#: 뒤 3종은 데모 쇼케이스용 신규 낱장 인쇄물(엽서·떡메모지·포토카드, 칼선 없음),
+#: banner 는 실사출력 대형(현수막) — 생성/렌더 부담을 줄이려 900x600mm 기준.
 PRODUCTS: dict[str, ProductSpec] = {
     "sticker": ProductSpec("sticker", (90.0, 90.0), dieline=True),
     "namecard": ProductSpec("namecard", (90.0, 50.0), dieline=False),
@@ -80,6 +81,7 @@ PRODUCTS: dict[str, ProductSpec] = {
     "postcard": ProductSpec("postcard", (100.0, 148.0), dieline=False),
     "memopad": ProductSpec("memopad", (100.0, 100.0), dieline=False),
     "photocard": ProductSpec("photocard", (55.0, 85.0), dieline=False),
+    "banner": ProductSpec("banner", (900.0, 600.0), dieline=False),
 }
 
 #: eval 코퍼스(inject_defects) 가 쓰는 기존 5종. manifest.json/corpus 의 정답은 이 5종에

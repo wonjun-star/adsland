@@ -1,4 +1,4 @@
-"""showcase 데모 세트 스팟 테스트 — 정상 8종 검판 통과 + 하자 결함 검출.
+"""showcase 데모 세트 스팟 테스트 — 정상 9종 검판 통과 + 하자 결함 검출.
 
 build_showcase 는 생성 직후 자체 검판(adversarial)을 수행하므로 정상/하자 정답이
 어긋나면 빌드 단계에서 이미 예외가 난다. 여기서는 그 계약을 tmp 디렉터리에서
@@ -32,17 +32,17 @@ def _preflight(out: Path, name: str, product: str):
 
 
 def test_counts_and_products(showcase):
-    """정상 8 + 하자 15 = 23, 정상 세트에 애즈랜드 8종이 모두 등장."""
+    """정상 9 + 하자 15 = 24, 정상 세트에 애즈랜드 9종이 모두 등장."""
     _out, entries = showcase
-    assert len(entries) == 23
-    assert sum(1 for e in entries if e["상태"] == "정상") == 8
+    assert len(entries) == 24
+    assert sum(1 for e in entries if e["상태"] == "정상") == 9
     assert sum(1 for e in entries if e["상태"] == "하자") == 15
     clean_products = {e["상품키"] for e in entries if e["상태"] == "정상"}
     assert clean_products == set(PRODUCTS)
 
 
-def test_clean_8_pass_gate(showcase):
-    """정상 8종은 검판 관문 통과(gate_ok, uncertain/fail 0건). sticker/label 은 칼선·재단선 pass."""
+def test_clean_9_pass_gate(showcase):
+    """정상 9종은 검판 관문 통과(gate_ok, uncertain/fail 0건). sticker/label 은 칼선·재단선 pass."""
     out, _entries = showcase
     for name, product in CLEAN_PLAN:
         rep = _preflight(out, name, product)

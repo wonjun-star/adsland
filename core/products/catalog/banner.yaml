@@ -1,0 +1,70 @@
+# 현수막·배너 슬롯 스키마 — core/products/schema.py::ProductSchema 형식 (docs/PLAN.md §7)
+# size.choices 는 core/quote/pricebook.yaml 의 banner 사이즈 키와 1:1 로 일치해야 한다.
+# 실사출력 대형 인쇄물이라 낱장 재단(cut_type)·인쇄면(sides)·코팅(coating) 슬롯은 없다.
+# 대신 후가공(finishing: 고리·로프·각목)을 pricebook addons 로 가산한다.
+product: banner
+display_name: 현수막·배너
+slots:
+  size:
+    display_name: 사이즈
+    required: true
+    infer_from: [file_trimbox]        # 파일 재단크기(TrimBox)에서 추론
+    ask_if_conflict: true             # 추론값과 고객 발화가 다르면 확인
+    choices: ["900x600", "1800x900", "3000x900", "600x1800"]
+    unit: mm
+    synonyms:
+      "작은 현수막": "900x600"
+      "가로 현수막": "1800x900"
+      "일반 현수막": "1800x900"
+      "긴 현수막": "3000x900"
+      "대형 현수막": "3000x900"
+      "엑스배너": "600x1800"
+      "x배너": "600x1800"
+      "세로 배너": "600x1800"
+  quantity:
+    display_name: 수량
+    required: true
+    infer_from: []
+    quick_options: [1, 3, 5]
+    unit: 장
+  material:
+    display_name: 원단
+    required: true
+    default: banner_cloth
+    risk_if_defaulted: low            # 기본값 통보 후 진행
+    choices: [banner_cloth, mesh, indoor_pet]
+    synonyms:
+      "현수막 원단": banner_cloth
+      "방수": banner_cloth
+      "방수 되는": banner_cloth
+      "야외": banner_cloth
+      "야외용": banner_cloth
+      "일반": banner_cloth
+      "메쉬": mesh
+      "메시": mesh
+      "망사": mesh
+      "바람 통하는": mesh
+      "바람 잘 통하는": mesh
+      "실내": indoor_pet
+      "실내용": indoor_pet
+      "거치대": indoor_pet
+      "거치대용": indoor_pet
+      "실내 배너": indoor_pet
+  finishing:
+    display_name: 후가공
+    required: false
+    default: grommet
+    risk_if_defaulted: low
+    choices: [grommet, rope, wood, "none"]
+    synonyms:
+      "고리": grommet
+      "아일렛": grommet
+      "끈": rope
+      "로프": rope
+      "각목": wood
+      "나무": wood
+      "목봉": wood
+      "후가공 없이": "none"
+      "후가공 없음": "none"
+gates:
+  production: [preflight_all_pass, customer_confirmed, no_escalation]

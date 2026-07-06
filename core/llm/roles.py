@@ -68,14 +68,15 @@ _PRODUCT_ALIASES: dict[str, tuple[str, ...]] = {
     "postcard": ("엽서",),
     "memopad": ("떡메모지", "메모지", "떡메모", "점착메모"),
     "photocard": ("포토카드", "포카"),
+    "banner": ("현수막", "배너", "미니배너", "엑스배너", "x배너", "실사출력"),
 }
 
 #: 애즈랜드가 취급하지만 아직 프로토타입에 없는 상품 — 알아채서 '준비 중'이라 안내한다
 #: (조용히 무시하고 이전 상품에 머무르지 않도록). id는 catalog에 없으므로 unknown_product 처리됨.
 _UNSUPPORTED_ALIASES: dict[str, tuple[str, ...]] = {
-    "banner": ("현수막", "배너", "미니배너", "엑스배너", "x배너", "슬로건", "실사출력"),
+    "slogan": ("슬로건", "어깨띠"),
 }
-UNSUPPORTED_LABELS: dict[str, str] = {"banner": "현수막·배너"}
+UNSUPPORTED_LABELS: dict[str, str] = {"slogan": "슬로건·어깨띠"}
 
 #: B유형: 파일은 있으나 수정·보완이 필요하다는 표현
 _TYPE_B_RE = re.compile(r"수정|고쳐|고치|보완")
@@ -541,6 +542,14 @@ VALUE_LABELS: dict[str, str] = {
     "woodfree_100": "모조지 100g",
     "woodfree_80": "모조지 80g",
     "pearl_300": "펄지 300g",
+    # 원단 (현수막·배너)
+    "banner_cloth": "현수막 원단(방수)",
+    "mesh": "메쉬 원단",
+    "indoor_pet": "실내 PET",
+    # 후가공 (현수막·배너)
+    "grommet": "고리",
+    "rope": "로프",
+    "wood": "각목",
     # 코팅
     "matte": "무광",
     "gloss": "유광",
@@ -578,6 +587,7 @@ _SLOT_DISPLAY_FALLBACK: dict[str, str] = {
     "coating": "코팅",
     "cut_type": "재단 형태",
     "sides": "인쇄면",
+    "finishing": "후가공",
 }
 
 # ------------------------------------------------ 한국어 조사 도우미
@@ -884,10 +894,11 @@ _QUESTION_TEMPLATES: dict[str, str] = {
     "coating": "코팅은 어떻게 할까요?",
     "cut_type": "재단은 어떤 모양으로 할까요?",
     "sides": "인쇄는 단면과 양면 중 어느 쪽으로 할까요?",
+    "finishing": "후가공은 어떻게 할까요?",
 }
 
 _GREETING = (
-    "안녕하세요! AI 인쇄 접수 도우미예요. 명함·스티커·전단·포스터·라벨·엽서·떡메모지·포토카드 인쇄를 도와드려요.\n"
+    "안녕하세요! AI 인쇄 접수 도우미예요. 명함·스티커·전단·포스터·라벨·엽서·떡메모지·포토카드·현수막 인쇄를 도와드려요.\n"
     "어떤 상품이 필요하신지 말씀해 주시고, 인쇄할 PDF 파일이 있다면 지금 바로 올려주셔도 돼요."
 )
 
@@ -954,7 +965,7 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
         pid = code.split(":", 1)[1]
         name = UNSUPPORTED_LABELS.get(pid, "말씀하신 상품")
         return (
-            f"{name}{_eun(name)} 아직 준비 중이에요. 지금은 명함·스티커·전단·포스터·라벨·엽서·떡메모지·포토카드를 "
+            f"{name}{_eun(name)} 아직 준비 중이에요. 지금은 명함·스티커·전단·포스터·라벨·엽서·떡메모지·포토카드·현수막을 "
             "도와드릴 수 있어요. 다른 상품으로 하시겠어요?"
         )
     if code.startswith("quote_missing:"):
@@ -1141,7 +1152,7 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
         parts.append("확인이 필요한 부분이 있어 담당자 검토로 넘겼어요.")
 
     if d.request_product:
-        parts.append("어떤 상품인가요? 명함·스티커·전단·포스터·라벨·엽서·떡메모지·포토카드.")
+        parts.append("어떤 상품인가요? 명함·스티커·전단·포스터·라벨·엽서·떡메모지·포토카드·현수막.")
     if d.request_file and not d.awaiting_confirm and not d.offer_design:
         parts.append("PDF 파일을 올려주시면 바로 검판해드려요.")
 

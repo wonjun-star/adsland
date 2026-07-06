@@ -1,11 +1,12 @@
-"""카탈로그 8종 + 견적 엔진 테스트.
+"""카탈로그 9종 + 견적 엔진 테스트.
 
 검증 대상:
-  1) catalog/*.yaml 8종이 ProductSchema 로 로드되고 필수 슬롯이 존재한다
+  1) catalog/*.yaml 9종이 ProductSchema 로 로드되고 필수 슬롯이 존재한다
   2) 카탈로그의 size/material/coating 값이 pricebook 매트릭스와 1:1 로 일치한다
   3) 견적 조회 성공(기본가 + 후가공 가산 + VAT) / 실패(missing, 추정 금지) 동작
   4) synonyms(고객 언어→스펙)가 스키마 데이터로 로드된다
   5) 신규 3종(엽서/떡메모지/포토카드)이 로드·견적된다
+  6) 현수막·배너(banner)가 로드·견적된다 (후가공 finishing 가산, cut_type/sides/coating 없음)
 """
 
 from __future__ import annotations
@@ -18,7 +19,9 @@ from core.quote.engine import PRICEBOOK_PATH, QuoteResult, quote
 PRODUCT_IDS = {"sticker", "namecard", "flyer", "poster", "label"}
 # 신규 3종(낱장, 칼선 없음). 떡메모지는 coating/sides 가 없어 별도 루프로 검증한다.
 NEW_PRODUCT_IDS = {"postcard", "memopad", "photocard"}
-ALL_PRODUCT_IDS = PRODUCT_IDS | NEW_PRODUCT_IDS
+# 현수막·배너 — finishing addon, cut_type/sides/coating 없음. 공통 루프 밖에서 별도 검증한다.
+BANNER_ID = "banner"
+ALL_PRODUCT_IDS = PRODUCT_IDS | NEW_PRODUCT_IDS | {BANNER_ID}
 
 
 def _pricebook() -> dict:
@@ -216,7 +219,8 @@ def test_quote_quantity_accepts_string():
 
 
 def test_quote_unknown_product_returns_none():
-    assert quote("banner", {"size": "600x1800", "quantity": 1}) is None
+    # pricebook 에 아예 없는 상품 → None (카탈로그-가격표 불일치 → 에스컬레이션 신호)
+    assert quote("tumbler", {"size": "600x1800", "quantity": 1}) is None
 
 
 def test_quote_unknown_size_returns_missing():
@@ -390,3 +394,124 @@ def test_quote_photocard_missing_sides_reported():
     )
     assert result is not None and not result.ok
     assert result.missing == ["sides=(미지정)"]
+
+
+# ════════════════════════════ 현수막·배너 (실사출력 대형) ════════════════════════════
+
+
+def test_banner_loads_with_finishing_slot():
+    """현수막은 size/quantity/material 필수 + 후가공(finishing) 선택. 낱장 슬롯은 없다."""
+    catalog = load_catalog()
+    banner = catalog[BANNER_ID]
+    assert banner.display_name == "현수막·배너"
+    slots = banner.slots
+    for name in ("size", "quantity", "material"):
+        assert name in slots and slots[name].required, f"banner.{name}"
+    for absent in ("cut_type", "sides", "coating"):
+        assert absent not in slots, f"banner 에 {absent} 슬롯이 있으면 안 됨"
+    fin = slots["finishing"]
+    assert fin.required is False
+    assert fin.default == "grommet"
+    assert set(fin.choices) == {"grommet", "rope", "wood", "none"}
+    assert slots["material"].default == "banner_cloth"
+    assert slots["quantity"].unit == "장"
+    assert slots["quantity"].quick_options == [1, 3, 5]
+    # 사이즈는 파일 TrimBox 추론 + 충돌 시 확인 (다른 상품과 동일 규약)
+    assert "file_trimbox" in slots["size"].infer_from
+    assert slots["size"].ask_if_conflict
+
+
+def test_banner_sizes_materials_and_finishing_match_pricebook():
+    catalog = load_catalog()
+    book = _pricebook()
+    entry = book["products"][BANNER_ID]
+    choices = catalog[BANNER_ID].slots["size"].choices
+    assert sorted(choices) == sorted(entry["prices"].keys())
+    materials = set(catalog[BANNER_ID].slots["material"].choices)
+    for size_key, by_material in entry["prices"].items():
+        assert materials == set(by_material.keys()), f"banner/{size_key}"
+    # finishing choices(none 제외) == addons.finishing 키
+    addon_fin = set(entry.get("addons", {}).get("finishing", {}).keys())
+    catalog_fin = set(catalog[BANNER_ID].slots["finishing"].choices) - {"none"}
+    assert catalog_fin == addon_fin
+
+
+def test_banner_synonyms_within_choices():
+    catalog = load_catalog()
+    mat = catalog[BANNER_ID].slots["material"]
+    assert mat.synonyms["방수"] == "banner_cloth"
+    assert mat.synonyms["망사"] == "mesh"
+    assert mat.synonyms["실내"] == "indoor_pet"
+    for word, target in mat.synonyms.items():
+        assert target in mat.choices, f"banner material: '{word}'→{target} 가 choices 에 없음"
+    fin = catalog[BANNER_ID].slots["finishing"]
+    assert fin.synonyms["고리"] == "grommet"
+    assert fin.synonyms["로프"] == "rope"
+    assert fin.synonyms["각목"] == "wood"
+    for word, target in fin.synonyms.items():
+        assert target in fin.choices, f"banner finishing: '{word}'→{target} 가 choices 에 없음"
+
+
+def test_banner_quick_options_are_valid_price_tiers():
+    catalog = load_catalog()
+    schema = catalog[BANNER_ID]
+    base = {
+        "size": schema.slots["size"].choices[0],
+        "material": schema.slots["material"].choices[0],
+        "finishing": "none",
+    }
+    for q in schema.slots["quantity"].quick_options:
+        result = quote(BANNER_ID, {**base, "quantity": q})
+        assert result is not None and result.ok, f"banner qty={q}: {result and result.missing}"
+
+
+def test_quote_banner_with_finishing_addon():
+    result = quote(
+        "banner",
+        {"size": "1800x900", "material": "mesh", "quantity": 3, "finishing": "rope"},
+    )
+    assert isinstance(result, QuoteResult)
+    assert result.ok and result.missing == []
+    # 기본가 57,000 + 로프 3,000 = 공급가 60,000 / VAT 6,000 / 합계 66,000
+    assert result.supply_amount == 60000
+    assert result.vat == 6000
+    assert result.total == 66000
+    assert [line.item for line in result.lines] == ["base", "finishing:rope"]
+
+
+def test_quote_banner_grommet_fixed_addon():
+    """후가공은 사이즈 무관 고정 가산(int 리프)."""
+    result = quote(
+        "banner",
+        {"size": "900x600", "material": "banner_cloth", "quantity": 1, "finishing": "grommet"},
+    )
+    assert result is not None and result.ok
+    # 기본가 8,000 + 고리 2,000 = 10,000 → VAT 1,000 → 11,000
+    assert result.total == 11000
+    assert [line.item for line in result.lines] == ["base", "finishing:grommet"]
+
+
+def test_quote_banner_no_finishing_single_line():
+    result = quote(
+        "banner",
+        {"size": "900x600", "material": "banner_cloth", "quantity": 1, "finishing": "none"},
+    )
+    assert result is not None and result.ok
+    # 후가공 none → 가산 0, 내역 1줄 (기본가 8,000 → VAT 800 → 8,800)
+    assert result.total == 8800
+    assert len(result.lines) == 1 and result.lines[0].item == "base"
+
+
+def test_quote_banner_off_tier_quantity_missing():
+    """수량 구간 밖(2장)은 보간하지 않고 missing."""
+    result = quote("banner", {"size": "900x600", "material": "banner_cloth", "quantity": 2})
+    assert result is not None
+    assert result.missing == ["quantity=2"]
+    assert result.total == 0 and result.lines == []
+
+
+def test_quote_banner_unknown_size_missing():
+    result = quote("banner", {"size": "500x500", "material": "banner_cloth", "quantity": 1})
+    assert result is not None
+    assert result.missing == ["size=500x500"]
+    assert result.total == 0 and result.lines == []

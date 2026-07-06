@@ -1,7 +1,7 @@
-"""데모용 '정상/하자 쇼케이스 세트' 생성기 — 애즈랜드 낱장 인쇄물 8종.
+"""데모용 '정상/하자 쇼케이스 세트' 생성기 — 애즈랜드 인쇄물 9종.
 
 사용자가 데모 화면에 드래그해 올려볼 수 있도록, 사람이 알아보는 한국어 파일명으로
-정상 8종 + 대표 하자 12종(단일) + 복합 하자 3종을 data/samples/showcase/ 에 만든다.
+정상 9종 + 대표 하자 12종(단일) + 복합 하자 3종을 data/samples/showcase/ 에 만든다.
 
 설계 원칙(코퍼스와 동일):
 - PDF 를 사후 mutate 하지 않는다. generate_clean.generate(defects=..., order=...) 가
@@ -41,6 +41,7 @@ PRODUCT_KO: dict[str, str] = {
     "postcard": "엽서",
     "memopad": "떡메모지",
     "photocard": "포토카드",
+    "banner": "현수막",
 }
 
 #: 결함키 → 자연스러운 한국어 결함명 (사용자 친화적)
@@ -87,7 +88,7 @@ STATUS_KO: dict[str, str] = {
 # 각 항목: (파일명, 상품키, [ (결함키, 파라미터오버라이드) ... ], 한국어 설명)
 # 결함이 빈 리스트면 정상 파일. dieline 결함은 칼선 상품(sticker/label)에만 얹는다.
 
-#: 정상 8종 — 상품마다 1개
+#: 정상 9종 — 상품마다 1개
 CLEAN_PLAN: list[tuple[str, str]] = [
     ("명함_정상.pdf", "namecard"),
     ("스티커_정상.pdf", "sticker"),
@@ -97,6 +98,7 @@ CLEAN_PLAN: list[tuple[str, str]] = [
     ("엽서_정상.pdf", "postcard"),
     ("떡메모지_정상.pdf", "memopad"),
     ("포토카드_정상.pdf", "photocard"),
+    ("현수막_정상.pdf", "banner"),
 ]
 
 #: 단일 하자 12종 — 결함 12종을 어울리는 상품에 하나씩
@@ -273,7 +275,7 @@ def _write_index(out_dir: Path, entries: list[dict[str, Any]]) -> None:
     n_clean = sum(1 for e in entries if e["상태"] == "정상")
     n_defect = len(entries) - n_clean
     index = {
-        "설명": "애즈랜드 낱장 인쇄물 8종 데모용 정상/하자 테스트 PDF 세트",
+        "설명": "애즈랜드 인쇄물 9종 데모용 정상/하자 테스트 PDF 세트",
         "생성방법": "python -m synth.showcase",
         "요약": {
             "전체": len(entries),
@@ -299,8 +301,8 @@ def _write_readme(out_dir: Path, entries: list[dict[str, Any]]) -> None:
     lines.append("# 데모용 정상/하자 테스트 PDF 세트")
     lines.append("")
     lines.append(
-        "애즈랜드에서 취급하는 낱장 인쇄물 8종(스티커·명함·전단·포스터·라벨·엽서·"
-        "떡메모지·포토카드)에 대한 데모용 샘플입니다. 데모 화면에 파일을 그대로 "
+        "애즈랜드에서 취급하는 인쇄물 9종(스티커·명함·전단·포스터·라벨·엽서·"
+        "떡메모지·포토카드·현수막)에 대한 데모용 샘플입니다. 데모 화면에 파일을 그대로 "
         "드래그해 올려 검판 결과를 확인해 보세요."
     )
     lines.append("")
@@ -330,7 +332,7 @@ def _write_readme(out_dir: Path, entries: list[dict[str, Any]]) -> None:
             )
         lines.append("")
 
-    _table("정상 8종", [e for e in entries if e["상태"] == "정상"])
+    _table("정상 9종", [e for e in entries if e["상태"] == "정상"])
     _table("단일 하자 12종", [e for e in entries if e["상태"] == "하자" and len(e["결함키"]) == 1])
     _table("복합 하자 3종", [e for e in entries if e["상태"] == "하자" and len(e["결함키"]) >= 2])
 

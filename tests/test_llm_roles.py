@@ -68,12 +68,20 @@ def test_classify_customer_type_b_fix_request():
 
 
 def test_classify_unsupported_product_is_flagged():
-    """애즈랜드가 팔지만 아직 없는 상품(현수막)은 'banner'로 인식 — 조용히 무시하지 않고
+    """애즈랜드가 팔지만 아직 없는 상품(슬로건·어깨띠)은 'slogan'으로 인식 — 조용히 무시하지 않고
     오케스트레이터가 '준비 중'으로 안내하게 한다. 카탈로그엔 없으므로 unknown_product 처리."""
-    p = classify_input("현수막 되나요?", CATALOG, adapter=None)
-    assert p.product == "banner"
+    p = classify_input("슬로건 되나요?", CATALOG, adapter=None)
+    assert p.product == "slogan"
     assert p.product not in CATALOG
     assert p.customer_type == CustomerType.A
+
+
+def test_classify_banner_now_supported():
+    """현수막·배너는 이제 정식 지원 상품 — 카탈로그의 banner 로 분류된다(더 이상 미지원 안내 아님)."""
+    for text in ("현수막 만들래요", "엑스배너 뽑고 싶어요", "실사출력 문의드려요"):
+        p = classify_input(text, CATALOG, adapter=None)
+        assert p.product == "banner", text
+        assert p.product in CATALOG
 
 
 def test_classify_truly_unknown_is_none():
