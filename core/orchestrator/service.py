@@ -119,6 +119,9 @@ class ReplyDirectives(BaseModel):
     detected_product: str = ""               # 파일 규격으로 상품을 알아챘을 때 표시명
     offer_back_side: bool = False            # 앞면만 올린 명함류 → 뒷면(양면) 확인
     customer_question: str = ""              # 고객이 던진 질문 (용지·사이즈·가격 등) → 답해야 함
+    customer_message: str = ""               # 고객이 방금 한 말 원문 (LLM이 의도 파악에 사용)
+    # 옵션별 실제 계산 가격 (지어내지 않게 미리 산출) — {슬롯: {"unit","quantity","choices":[{value,total}]}}
+    option_prices: dict[str, Any] = Field(default_factory=dict)
 
 
 class TurnResult(BaseModel):
@@ -384,6 +387,48 @@ class IntakeService:
         if prev is not None and entry.get("source") in ("user", "default"):
             return f"size_from_file:{value}"
         return None
+
+    def _option_prices(self, row: OrderSession, schema: ProductSchema) -> dict[str, Any]:
+        """옵션(용지·코팅·사이즈 등)을 하나씩 바꿔가며 실제 견적을 계산한 표.
+
+        수량이 정해져 있어야 계산할 수 있다. 각 슬롯의 선택지별 총액(부가세 포함)을 담아,
+        고객이 "각각 얼마?", "옵션별로 비교해줘" 같은 걸 물으면 LLM이 지어내지 않고
+        이 값으로 답하게 한다. (측정·계산은 결정론, LLM은 번역만 — 철칙 2)
+        """
+        if not row.product:
+            return {}
+        slots = row.slots or {}
+        base = {k: v.get("value") for k, v in slots.items() if v.get("value") is not None}
+        # 필수값을 기본값으로 채워 계산 가능한 상태로 (비교축은 아래에서 덮어씀)
+        for name, sdef in schema.required_slots().items():
+            if base.get(name) is None:
+                if sdef.has_default:
+                    base[name] = sdef.default
+                elif sdef.choices:
+                    base[name] = str(sdef.choices[0])
+        if base.get("quantity") is None:
+            return {}  # 수량 없이는 가격을 낼 수 없다
+
+        matrix: dict[str, Any] = {}
+        for name, sdef in schema.slots.items():
+            choices = list(sdef.choices)
+            if len(choices) < 2:
+                continue  # 고를 게 하나뿐이면 비교 의미 없음
+            priced: list[dict[str, Any]] = []
+            for choice in choices:
+                q = quote(row.product, {**base, name: str(choice)})
+                if q is None or q.missing:
+                    continue
+                priced.append({"value": str(choice), "total": q.total})
+            if len(priced) >= 2:
+                matrix[name] = {
+                    "display_name": sdef.display_name or name,
+                    "unit": sdef.unit,
+                    "quantity": base["quantity"],
+                    "current": base.get(name),
+                    "choices": priced,
+                }
+        return matrix
 
     def _bleed_tolerant_match(self, schema: ProductSchema, w: float, h: float) -> str | None:
         """파일이 '표준 규격 + 재단여백' 범위 안이면 그 표준 규격 선택지를 돌려준다.
@@ -1112,6 +1157,10 @@ class IntakeService:
                     near = self._nearest_size_choice(schema, size_val)
                     if near:
                         d.notices.append(f"custom_size_estimate:{size_val}:{near}")
+
+        # 옵션별 실제 가격을 미리 계산해 둔다 — 고객이 "각각 얼마?"처럼 물으면
+        # LLM이 이 값을 그대로 써서 답한다(지어내지 않게). 수량을 알아야 계산 가능.
+        d.option_prices = self._option_prices(row, schema)
 
         # 변경 이력 (접수본 → 최종본) — 자동 보정 등이 적용됐으면 채워진다
         d.changes = self._build_changes(session_id)

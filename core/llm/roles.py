@@ -941,11 +941,22 @@ def render_reply(
             for name, sdef in schema.slots.items():
                 if sdef.choices:
                     available[_slot_display(name, schema)] = [_label(c) for c in sdef.choices]
+        # 옵션별 실제 가격표 (라벨 붙여서) — "각각 얼마?" 같은 질문에 이 값 그대로 답하게.
+        prices_by_option: dict[str, Any] = {}
+        for slot, info in (directives.option_prices or {}).items():
+            label = info.get("display_name") or _slot_display(slot, schema)
+            prices_by_option[label] = {
+                "기준수량": info.get("quantity"),
+                "현재선택": _label(info["current"]) if info.get("current") is not None else None,
+                "가격_부가세포함": {_label(c["value"]): c["total"] for c in info.get("choices", [])},
+            }
         payload = {
             "directives": directives.model_dump(mode="json"),
             "session": view.model_dump(mode="json"),
             "product_display_name": schema.display_name if schema else None,
             "available_options": available,  # 이 목록 밖의 값은 절대 제안하지 마라
+            "customer_message": directives.customer_message,  # 고객이 방금 한 말 원문
+            "prices_by_option": prices_by_option,  # 옵션별 실제 계산가 (지어내지 말 것)
         }
         system = _load_prompt("dialog_v1.md")
         raw = adapter.complete(
@@ -1165,6 +1176,37 @@ def _answer_question(question: str, schema: ProductSchema | None, d: "ReplyDirec
     return None
 
 
+#: 옵션별 비교 요청 감지 키워드 (규칙 폴백용 — LLM 모드는 프롬프트가 직접 처리)
+_COMPARE_KEYS = (
+    "각각", "옵션별", "종류별", "별로얼마", "비교", "각각의", "용지별",
+    "재질별", "코팅별", "사이즈별", "크기별", "규격별", "수량별", "별견적",
+)
+_COMPARE_SLOT_HINTS = {
+    "용지": "material", "재질": "material", "종이": "material",
+    "코팅": "coating", "사이즈": "size", "크기": "size", "규격": "size", "수량": "quantity",
+}
+
+
+def _comparison_line(d: "ReplyDirectives", schema: ProductSchema | None) -> str | None:
+    """'각각 얼마?'류 요청이면 옵션별 실제 계산가를 한 줄 표로. (숫자는 미리 계산된 값)"""
+    msg = (getattr(d, "customer_message", "") or "").replace(" ", "")
+    prices = getattr(d, "option_prices", None) or {}
+    if not prices or not any(k in msg for k in _COMPARE_KEYS):
+        return None
+    target = None
+    for key, slot in _COMPARE_SLOT_HINTS.items():
+        if key in msg and slot in prices:
+            target = slot
+            break
+    if target is None:
+        target = next((s for s in ("material", "size", "coating") if s in prices), next(iter(prices)))
+    info = prices[target]
+    qunit = schema.slots["quantity"].unit if schema and "quantity" in schema.slots else "매"
+    disp = info.get("display_name") or _slot_display(target, schema)
+    items = " · ".join(f"{_label(c['value'])} {_won(c['total'])}" for c in info.get("choices", []))
+    return f"{_fmt_num(info.get('quantity'))}{qunit} 기준 {disp}별 견적이에요 — {items} (부가세 포함)."
+
+
 def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchema | None) -> str:
     """결과 우선·최소 대화 템플릿 — 상세는 카드가, 말은 짧게.
 
@@ -1186,8 +1228,12 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
 
     parts: list[str] = []
 
+    # 옵션별 비교 요청이면 실제 계산가 표를 먼저 보여준다 (지어내지 않음)
+    comparison = _comparison_line(d, schema)
+    if comparison:
+        parts.append(comparison)
     # 고객 질문에 먼저 답한다 (자기 흐름보다 우선)
-    if getattr(d, "customer_question", ""):
+    elif getattr(d, "customer_question", ""):
         ans = _answer_question(d.customer_question, schema, d)
         if ans:
             parts.append(ans)
@@ -1242,14 +1288,15 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
     elif len(normal_qs) >= 2:
         parts.append(_merged_question_line(normal_qs, schema))
 
-    # 확정 단계 — 검토 → 최종본 → 진행. (단, 고객이 질문한 턴엔 확정 재촉하지 않는다)
-    if d.awaiting_confirm and not getattr(d, "customer_question", ""):
+    # 확정 단계 — 검토 → 최종본 → 진행. (단, 고객이 질문·비교를 요청한 턴엔 확정 재촉하지 않는다)
+    asked_something = bool(comparison) or bool(getattr(d, "customer_question", ""))
+    if d.awaiting_confirm and not asked_something:
         if d.changes:
             parts.append("검토 결과를 반영한 최종본이에요. 이대로 진행할까요?")
         else:
             parts.append("검판 통과했어요. 이대로 진행할까요?")
-    elif d.awaiting_confirm and getattr(d, "customer_question", ""):
-        parts.append("바꾸실 거면 말씀해주시고, 괜찮으시면 이대로 진행할게요.")
+    elif d.awaiting_confirm and asked_something:
+        parts.append("정하시면 말씀해주세요 — 그 사양으로 바로 마무리할게요.")
 
     if d.gate_blockers:
         parts.append("확정 전에 남은 항목: " + ", ".join(_blocker_line(b) for b in d.gate_blockers))
