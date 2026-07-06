@@ -105,20 +105,33 @@ export default function App() {
     [session, busy, push, runTurn],
   )
 
-  const uploadFile = useCallback(
-    (file) => {
-      if (!session || busy || !file) return
+  const uploadOne = useCallback(
+    async (file) => {
       const name = file.name || 'upload.pdf'
-      if (file.type !== 'application/pdf' && !/\.pdf$/i.test(name)) {
-        push({ role: 'system', text: 'PDF 파일만 접수할 수 있어요. 인쇄용 PDF로 저장한 뒤 다시 올려 주세요.' })
-        return
-      }
       push({ role: 'user', text: name, isFile: true })
       const formData = new FormData()
       formData.append('file', file)
-      runTurn(() => api(`/api/session/${session.id}/upload`, { method: 'POST', formData }))
+      await runTurn(() => api(`/api/session/${session.id}/upload`, { method: 'POST', formData }))
     },
-    [session, busy, push, runTurn],
+    [session, push, runTurn],
+  )
+
+  // 여러 파일을 한 번에 올려도 순서대로 접수 (예: 명함 앞면·뒷면 → 양면으로 병합)
+  const uploadFiles = useCallback(
+    async (fileList) => {
+      if (!session || busy || !fileList) return
+      const files = Array.from(fileList).filter(
+        (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name || ''),
+      )
+      if (files.length === 0) {
+        push({ role: 'system', text: 'PDF 파일만 접수할 수 있어요. 인쇄용 PDF로 저장한 뒤 다시 올려 주세요.' })
+        return
+      }
+      for (const f of files) {
+        await uploadOne(f)
+      }
+    },
+    [session, busy, push, uploadOne],
   )
 
   const applyAutofix = useCallback(
@@ -221,7 +234,7 @@ export default function App() {
             session={session}
             onSend={sendMessage}
             onSelect={selectOption}
-            onUpload={uploadFile}
+            onUpload={uploadFiles}
             onAutofix={applyAutofix}
             onDesign={applyDesign}
             onConfirm={confirmOrder}

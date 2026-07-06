@@ -921,7 +921,10 @@ class IntakeService:
 
         if report is None:
             report = self._latest_report(session_id)
-        d.report = report
+        # 리포트는 업로드·보정·시안생성 직후에만 응답에 서술한다 (매 턴 검판 말 반복 방지).
+        # 게이트·추론 등 내부 판단은 아래 지역변수 report를 그대로 쓴다.
+        if kind in ("upload", "autofix", "design"):
+            d.report = report
 
         if not row.product:
             d.request_product = True
@@ -1030,13 +1033,32 @@ class IntakeService:
         row = self._get(session_id)
         d.escalation_reasons = list(row.escalation_reasons or [])
 
-        # autofix 제안 (fail이면서 자동 수정 가능한 체크)
-        if report is not None:
-            d.offer_autofix = [
-                r.check_id
-                for r in report.results
-                if r.status == CheckStatus.FAIL and r.autofix.available
-            ]
+        # autofix 제안: 업로드/보정 직후, 또는 사양은 다 됐는데 자동보정 가능한 결함만 남아
+        # 막혔을 때만 (매 턴 "여백 보정 가능" 반복 방지).
+        autofixable = (
+            [r.check_id for r in report.results if r.status == CheckStatus.FAIL and r.autofix.available]
+            if report is not None
+            else []
+        )
+        otherwise_ready = (
+            not d.questions
+            and not d.conflicts
+            and not required_missing
+            and not needs_back
+            and quote_result is not None
+            and not quote_result.missing
+        )
+        if kind in ("upload", "autofix"):
+            d.offer_autofix = autofixable
+        elif (
+            autofixable
+            and otherwise_ready
+            and report is not None
+            and not report.uncertains
+            and not [r for r in report.failures if not r.autofix.available]
+        ):
+            d.offer_autofix = autofixable
+            d.notices.append("autofix_to_finish")
 
         # 상태 전진: 질문·충돌 없음 ∧ 파일 검판 clean → PROOF_CONFIRM
         state = State(row.state)

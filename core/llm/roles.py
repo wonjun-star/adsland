@@ -935,17 +935,24 @@ def render_reply(
     directives의 확정값 그대로다 (철칙 2). LLM 응답이 비면 ParseError.
     """
     if adapter is not None:
+        # 상품별 선택 가능한 값(라벨)을 함께 넘긴다 — LLM이 없는 규격/옵션을 지어내지 못하게.
+        available: dict[str, list[str]] = {}
+        if schema is not None:
+            for name, sdef in schema.slots.items():
+                if sdef.choices:
+                    available[_slot_display(name, schema)] = [_label(c) for c in sdef.choices]
         payload = {
             "directives": directives.model_dump(mode="json"),
             "session": view.model_dump(mode="json"),
             "product_display_name": schema.display_name if schema else None,
+            "available_options": available,  # 이 목록 밖의 값은 절대 제안하지 마라
         }
         system = _load_prompt("dialog_v1.md")
         raw = adapter.complete(
             system,
             [{"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)}],
             role="dialog",
-            max_tokens=800,
+            max_tokens=320,  # 짧게 — 결과 우선(2~4줄), 생성 속도도 빨라짐
         )
         reply = raw.strip()
         if not reply:
@@ -1013,6 +1020,8 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
         return "보정할 파일이 아직 없어요. 먼저 PDF 파일을 올려주세요."
     if code == "need_back_side_file":
         return "양면으로 진행하려면 뒷면 파일도 올려주세요. (지금은 앞면 1장만 받았어요)"
+    if code == "autofix_to_finish":
+        return "사양은 다 정해졌어요. 재단 여백만 자동으로 채우면 바로 확정할 수 있어요 — 보정해드릴까요?"
     if code == "back_side_merged":
         return "두 번째 파일은 뒷면으로 봤어요 — 앞뒤 양면으로 합쳐서 검판했어요. 한 면만 하실 거면 알려주세요."
     if code.startswith("size_from_file:"):

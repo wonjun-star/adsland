@@ -91,9 +91,9 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
     }
   }
 
-  const pickFile = (file) => {
-    if (!file) return
-    onUpload(file)
+  const pickFiles = (files) => {
+    if (!files || files.length === 0) return
+    onUpload(files) // 여러 개면 순서대로 접수 (앞면·뒷면 등)
   }
 
   const handleDrop = (e) => {
@@ -101,7 +101,7 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
     dragDepth.current = 0
     setDragging(false)
     if (!canSend) return
-    pickFile(e.dataTransfer?.files?.[0])
+    pickFiles(e.dataTransfer?.files)
   }
 
   return (
@@ -162,9 +162,10 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
           ref={fileRef}
           type="file"
           accept="application/pdf,.pdf"
+          multiple
           hidden
           onChange={(e) => {
-            pickFile(e.target.files?.[0])
+            pickFiles(e.target.files)
             e.target.value = ''
           }}
         />

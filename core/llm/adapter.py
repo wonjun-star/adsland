@@ -13,10 +13,11 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 
-#: 역할별 모델 — 사용자 요청으로 전 역할 Sonnet 5 (환경변수로 개별 override 가능).
+#: 역할별 모델. 분류·슬롯 파싱은 구조 추출이라 빠른 Haiku(속도↑, 품질 동일),
+#: 자연스러운 대화 생성만 Sonnet 5. 전부 Sonnet으로 쓰려면 MODEL_* 환경변수로 override.
 TIER_MODELS: dict[str, str] = {
-    "classify": os.environ.get("MODEL_CLASSIFY", "claude-sonnet-5"),
-    "parse": os.environ.get("MODEL_PARSE", "claude-sonnet-5"),
+    "classify": os.environ.get("MODEL_CLASSIFY", "claude-haiku-4-5-20251001"),
+    "parse": os.environ.get("MODEL_PARSE", "claude-haiku-4-5-20251001"),
     "dialog": os.environ.get("MODEL_DIALOG", "claude-sonnet-5"),
 }
 
