@@ -22,10 +22,53 @@ from core.preflight.report import AutofixInfo, CheckResult, CheckStatus
 REQUIRED_MM = 3.0
 #: 허용오차 — 이 값만큼 부족해도 통과 (좌표 반올림·생성 툴 오차 흡수)
 TOLERANCE_MM = 0.1
+#: 파일이 재단선(주문 규격)보다 커서 '재단여백을 이미 포함'한 경우의 최소 인정치.
+#: 이만큼이라도 여분이 있으면 '여백이 들어간 파일'로 보고 통과 — 고객이 일부러 크게 넣은 것.
+INTENTIONAL_BLEED_MIN_MM = 1.0
 #: 부동소수점 경계 흔들림 방지용
 _EPS = 1e-6
 
 _SIDES = ("left", "right", "top", "bottom")
+
+
+def _insets_from_boxes(trim, media, bleed_box) -> dict[str, float]:
+    """TrimBox 기준 4방향 여백(mm) — 바깥 박스는 MediaBox·BleedBox 중 넓은 쪽."""
+    outer = media
+    if bleed_box is not None:
+        outer = (
+            min(outer[0], bleed_box[0]),
+            min(outer[1], bleed_box[1]),
+            max(outer[2], bleed_box[2]),
+            max(outer[3], bleed_box[3]),
+        )
+    return {
+        "left": pt_to_mm(trim[0] - outer[0]),
+        "bottom": pt_to_mm(trim[1] - outer[1]),
+        "right": pt_to_mm(outer[2] - trim[2]),
+        "top": pt_to_mm(outer[3] - trim[3]),
+    }
+
+
+def _insets_from_order(media, order_mm) -> dict[str, float] | None:
+    """TrimBox가 없을 때, 주문 규격(재단선)을 미디어 중앙에 놓고 재단여백을 잰다.
+
+    파일이 규격보다 큰 방향의 여분이 곧 재단여백이다(예: 90x50 재단선 + 53x94 파일 → 사방 1.5~2mm).
+    규격이 미디어에 아예 안 들어가면(파일이 더 작음) None → 여백 없음으로 폴백.
+    """
+    mw = pt_to_mm(media[2] - media[0])
+    mh = pt_to_mm(media[3] - media[1])
+    ow, oh = float(order_mm[0]), float(order_mm[1])
+    cands = [
+        (tw, th, (mw - tw) + (mh - th))
+        for tw, th in ((ow, oh), (oh, ow))
+        if tw <= mw + 0.5 and th <= mh + 0.5
+    ]
+    if not cands:
+        return None
+    tw, th, _slack = min(cands, key=lambda c: c[2])  # 가장 꽉 차는 방향 = 실제 배치
+    lr = max(0.0, (mw - tw) / 2.0)
+    tb = max(0.0, (mh - th) / 2.0)
+    return {"left": lr, "right": lr, "top": tb, "bottom": tb}
 
 
 def _inherited_mediabox(ctx: CheckContext, page_index: int):
@@ -43,7 +86,10 @@ def _measure(ctx: CheckContext) -> CheckResult:
     min_insets = {s: math.inf for s in _SIDES}
     bad_pages: list[int] = []          # 여백 미달 페이지
     no_trim_pages: list[int] = []      # TrimBox 부재 → trim==media 간주 페이지
+    order_bleed_pages: list[int] = []  # TrimBox 없지만 규격보다 커서 여백 인정한 페이지
     no_media_pages: list[int] = []     # MediaBox조차 해석 불가 → 판단 불가 페이지
+
+    order_mm = ctx.order.size_mm if ctx.order else None
 
     page_count = ctx.page_count
     if page_count == 0:
@@ -62,31 +108,31 @@ def _measure(ctx: CheckContext) -> CheckResult:
             continue
 
         trim = boxes.get("trim")
-        if trim is None:
-            # TrimBox 부재: 재단 위치 정보가 없으므로 trim==media → 여백 0mm
-            no_trim_pages.append(i)
-            trim = media
-
-        # 바깥 박스 = MediaBox와 BleedBox 중 방향별로 더 넓은 쪽
-        outer = media
         bleed_box = boxes.get("bleed")
-        if bleed_box is not None:
-            outer = (
-                min(outer[0], bleed_box[0]),
-                min(outer[1], bleed_box[1]),
-                max(outer[2], bleed_box[2]),
-                max(outer[3], bleed_box[3]),
-            )
+        order_derived = False
 
-        insets_mm = {
-            "left": pt_to_mm(trim[0] - outer[0]),
-            "bottom": pt_to_mm(trim[1] - outer[1]),
-            "right": pt_to_mm(outer[2] - trim[2]),
-            "top": pt_to_mm(outer[3] - trim[3]),
-        }
+        # 1) 파일 박스(TrimBox/BleedBox) 기준 여백 — 디자이너가 도련을 제대로 잡은 경우
+        box_insets = _insets_from_boxes(trim if trim is not None else media, media, bleed_box)
+        box_min = min(box_insets.values())
+
+        # 2) 박스상 여백이 사실상 0인데(도련 미표기·trim==media) 파일이 재단선(주문 규격)보다
+        #    크면, 그 여분이 곧 재단여백이다 — 고객이 크기에 여백을 포함해 넣은 것.
+        if box_min + _EPS < INTENTIONAL_BLEED_MIN_MM and order_mm:
+            derived = _insets_from_order(media, order_mm)
+            if derived is not None and min(derived.values()) + _EPS >= INTENTIONAL_BLEED_MIN_MM:
+                box_insets = derived
+                order_derived = True
+                order_bleed_pages.append(i)
+
+        if not order_derived and trim is None:
+            no_trim_pages.append(i)
+
+        insets_mm = box_insets
         for side, v in insets_mm.items():
             min_insets[side] = min(min_insets[side], v)
-        if min(insets_mm.values()) + _EPS < REQUIRED_MM - TOLERANCE_MM:
+        # 규격보다 커서 여백을 이미 포함한 파일은 완화 기준, 그 외는 3mm 기준
+        floor = INTENTIONAL_BLEED_MIN_MM if order_derived else REQUIRED_MM - TOLERANCE_MM
+        if min(insets_mm.values()) + _EPS < floor:
             bad_pages.append(i)
 
     if len(no_media_pages) == page_count:
@@ -112,9 +158,17 @@ def _measure(ctx: CheckContext) -> CheckResult:
         "insets_mm": {s: round(min_insets[s], 3) for s in _SIDES},
         "min_mm": round(min(min_insets.values()), 3),
     }
+    if order_bleed_pages:
+        # 규격보다 큰 파일 = 재단여백을 이미 포함 (검판원·UI가 긍정적으로 표시하게)
+        measured["includes_bleed"] = True
     required = {"min_mm": REQUIRED_MM}
 
     notes: list[str] = []
+    if order_bleed_pages:
+        notes.append(
+            "재단선(주문 규격)보다 큰 파일 — 그 여분을 재단여백으로 인정: "
+            f"사방 최소 {measured['min_mm']}mm 확보됨"
+        )
     if no_trim_pages:
         notes.append(
             f"TrimBox 없음 → trim==MediaBox로 간주(재단여백 0mm): pages={no_trim_pages}"

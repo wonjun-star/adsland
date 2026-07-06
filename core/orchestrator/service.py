@@ -352,6 +352,13 @@ class IntakeService:
         try:
             ctx = CheckContext(row.file_path)
             size = ctx.trim_size_mm(0)
+            if not size:
+                # TrimBox 없는 파일도 흔하다 — MediaBox 크기로 규격을 잡는다
+                from core.preflight.engine import pt_to_mm
+
+                mb = ctx.page_boxes(0).get("media")
+                if mb:
+                    size = (pt_to_mm(mb[2] - mb[0]), pt_to_mm(mb[3] - mb[1]))
             ctx.close()
         except Exception:
             return None
