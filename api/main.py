@@ -267,6 +267,19 @@ def create_app() -> FastAPI:
         transcript = pipeline.service.transcript(session_id)
         return {"session": view.model_dump(mode="json"), "transcript": transcript}
 
+    @app.get("/api/session/{session_id}/ordersheet")
+    def get_ordersheet(session_id: str):
+        """오더지 — 내부 검수자·생산에게 전달되는 작업지시서."""
+        sheet = run_or_404(pipeline.service.order_sheet, session_id)
+        # 파일 미리보기 로컬 경로 → URL
+        file_info = dict(sheet.get("file") or {})
+        file_info["preview_url"] = _to_file_url(file_info.pop("preview", None))
+        sheet["file"] = file_info
+        for ch in sheet.get("changes", []):
+            ch["before_url"] = _to_file_url(ch.pop("before_preview", None))
+            ch["after_url"] = _to_file_url(ch.pop("after_preview", None))
+        return sheet
+
     @app.post("/api/session/{session_id}/message")
     def post_message(session_id: str, body: MessageBody):
         result, reply = run_or_404(pipeline.process_message, session_id, body.text)

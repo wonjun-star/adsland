@@ -10,6 +10,7 @@ cards의 숫자·상태는 전부 결정론적 엔진 출력이며 LLM을 거치
 
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -600,6 +601,83 @@ class IntakeService:
             {"seq": e.seq, "ts": e.ts.isoformat(), "type": e.type, "payload": e.payload}
             for e in self.store.events(session_id)
         ]
+
+    def order_sheet(self, session_id: str) -> dict:
+        """고객과의 대화 → 내부 검수자·생산에게 전달되는 '오더지'(작업지시서).
+
+        대화에서 확정된 사양·검판 결과·변경 내역·최종 파일을 한 장으로 정리한다.
+        결정론 엔진의 출력만 담으며, 검수자가 이걸 보고 바로 생산에 넘길 수 있어야 한다.
+        """
+        row = self._get(session_id)
+        schema = self.catalog.get(row.product) if row.product else None
+        report = self._latest_report(session_id)
+        quote = None
+        if schema:
+            quote = self._quote(row) or self._estimate_quote(row, schema)
+        changes = self._build_changes(session_id)
+
+        order_no = None
+        created_at = None
+        for e in self.store.events(session_id):
+            if e.type == "session_created":
+                created_at = e.ts.isoformat()
+            if e.type == "payment_mock":
+                order_no = e.payload.get("order_no")
+
+        # 사양 (스키마 선언 순서대로)
+        specs: list[dict] = []
+        if schema:
+            for name, sd in schema.slots.items():
+                v = (row.slots or {}).get(name, {}).get("value")
+                if v is None:
+                    continue
+                src = (row.slots or {}).get(name, {}).get("source")
+                specs.append(
+                    {"slot": name, "label": sd.display_name or name, "value": v,
+                     "unit": sd.unit, "source": src}
+                )
+
+        # 검판 요약 (문제 항목 위주)
+        from core.llm.roles import translate_check
+
+        issues: list[dict] = []
+        if report is not None:
+            for r in report.results:
+                if str(r.status) == "pass":
+                    continue
+                issues.append({"check_id": r.check_id, "status": str(r.status),
+                               "message": translate_check(r)})
+
+        final_preview = (
+            self._render_preview_png(Path(row.file_path), session_id) if row.file_path else None
+        )
+        content = {k: v for k, v in (row.card_content or {}).items() if v}
+
+        return {
+            "session_id": session_id,
+            "order_no": order_no,
+            "status": row.state,
+            "confirmed": bool(row.customer_confirmed),
+            "escalated": bool(row.escalated),
+            "escalation_reasons": list(row.escalation_reasons or []),
+            "created_at": created_at,
+            "product": row.product,
+            "specs": specs,
+            "card_content": content,
+            "quote": quote.model_dump(mode="json") if quote else None,
+            "quote_is_estimate": bool(quote and self._quote(row) is None),
+            "file": {
+                "name": re.sub(r"^up_\d+_", "", Path(row.file_path).name) if row.file_path else None,
+                "pages": self._page_count(row.file_path) if row.file_path else None,
+                "preview": final_preview,
+            },
+            "preflight": {
+                "gate_ok": report.gate_ok if report else None,
+                "issues": issues,
+            },
+            "changes": changes,
+            "turn_count": row.turn_count,
+        }
 
     # ------------------------------------------------------------ 내부
 
