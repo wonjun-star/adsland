@@ -25,6 +25,12 @@ TOLERANCE_MM = 0.1
 #: 파일이 재단선(주문 규격)보다 커서 '재단여백을 이미 포함'한 경우의 최소 인정치.
 #: 이만큼이라도 여분이 있으면 '여백이 들어간 파일'로 보고 통과 — 고객이 일부러 크게 넣은 것.
 INTENTIONAL_BLEED_MIN_MM = 1.0
+#: 박스 여백이 '사방 이 값 이하'면 trim==media(도련 미표기)로 보고 규격 기준 여백을 잰다.
+#: 이보다 큰 값이 한 변이라도 있으면 실제 TrimBox가 있는 것 → 편측 배치일 수 있어 실측을 신뢰.
+_SYMMETRIC_ZERO_MM = 0.5
+#: 규격 기준으로 잰 여분이 이보다 크면 '재단여백'이 아니라 크기 오류로 본다(page_size가 반려).
+#: page_size의 BLEED_OVER_MM(8mm, 사방 4mm)과 맞춘 상한.
+_DERIVED_MAX_MM = 4.0
 #: 부동소수점 경계 흔들림 방지용
 _EPS = 1e-6
 
@@ -119,13 +125,19 @@ def _measure(ctx: CheckContext) -> CheckResult:
         # 1) 파일 박스(TrimBox/BleedBox) 기준 여백 — 디자이너가 도련을 제대로 잡은 경우
         box_insets = _insets_from_boxes(trim if trim is not None else media, media, bleed_box)
         box_min = min(box_insets.values())
+        box_max = max(box_insets.values())
 
-        # 2) 박스상 여백이 품목 요구치에 못 미치는데(도련 미표기·trim==media 등) 파일이
-        #    재단선(주문 규격)보다 크면, 그 여분을 재단여백으로 다시 잰다 — 고객이 크기에
-        #    여백을 포함해 넣은 경우. (판정 기준은 아래 floor_mm = 품목 요구 도련)
-        if box_min + _EPS < required_mm and order_mm:
+        # 2) 박스 여백이 '사방 거의 0'(도련 미표기·trim==media)이고 파일이 규격보다 크면,
+        #    그 여분을 재단여백으로 다시 잰다 — 고객이 크기에 여백을 포함해 넣은 경우.
+        #    단, 한 변이라도 실제 여백이 있으면(편측 TrimBox 등) 실측을 신뢰하고 덮어쓰지 않는다.
+        #    또 여분이 과도하면(> _DERIVED_MAX) 재단여백이 아니라 크기 오류로 본다.
+        if box_max + _EPS < _SYMMETRIC_ZERO_MM and box_min + _EPS < required_mm and order_mm:
             derived = _insets_from_order(media, order_mm)
-            if derived is not None and min(derived.values()) > box_min + _EPS:
+            if (
+                derived is not None
+                and min(derived.values()) > box_min + _EPS
+                and min(derived.values()) <= _DERIVED_MAX_MM + _EPS
+            ):
                 box_insets = derived
                 order_derived = True
 

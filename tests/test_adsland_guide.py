@@ -116,6 +116,28 @@ def test_flyer_2mm_bleed_passes(tmp_path):
     assert r.status == CheckStatus.PASS, r.detail
 
 
+def test_offcenter_trimbox_short_side_fails(tmp_path):
+    """편측 TrimBox로 한 변 도련이 부족하면, 중심 배치 가정으로 가려지지 않고 fail해야 한다.
+
+    (교차검증에서 나온 버그: order-derived가 실측 편측 부족을 대칭 이상값으로 덮어써 거짓 PASS)
+    """
+    to_pt = lambda v: v * 72 / 25.4
+    mw, mh = 96 * mm, 56 * mm
+    p = tmp_path / "offcenter.pdf"
+    c = canvas.Canvas(str(p), pagesize=(mw, mh))
+    c.setFillColorRGB(0.1, 0.2, 0.6)
+    c.rect(0, 0, mw, mh, fill=1, stroke=0)
+    c.showPage()
+    c.save()
+    # 재단 90x50을 왼쪽으로 붙여 배치: 왼쪽 도련 1mm, 오른쪽 5mm (사방 비대칭)
+    pdf = pikepdf.open(str(p), allow_overwriting_input=True)
+    pdf.pages[0].TrimBox = [to_pt(1), to_pt(3), to_pt(1 + 90), to_pt(3 + 50)]
+    pdf.save(str(p))
+    pdf.close()
+    r = _run_bleed(str(p), "sticker", (90.0, 50.0))  # 스티커 3mm 요구
+    assert r.status == CheckStatus.FAIL, f"왼쪽 1mm는 3mm 요구 미달 → fail 이어야: {r.detail}"
+
+
 @pytest.mark.parametrize("check_id", ["bleed", "colorspace", "resolution", "trim_safety"])
 def test_remediation_exists_for_key_checks(check_id):
     """주요 검수 항목엔 가이드 근거 수정 안내가 있어야 한다."""

@@ -41,6 +41,53 @@ GUIDE_URLS: dict[str, str] = {
 }
 
 
+#: 애즈랜드 주문 페이지에서 확보한 **재단(완성) 규격 크기 mm** (편집=재단+도련, 안전=재단-여백).
+#: 주문 페이지 spec 테이블(HTML)·톰슨 가이드에서 직접 파싱/판독한 값. (지어낸 값 아님)
+#: 참고용 — 카탈로그/가격표를 애즈랜드 전 규격에 맞추는 것은 별도 작업(가격 매핑 필요).
+STANDARD_SIZES: dict[str, dict] = {
+    "namecard": {
+        "mode": "free_input",           # 고정 규격표 없이 자유 입력
+        "min_mm": (85.0, 45.0), "max_mm": (150.0, 100.0),
+        "presets_mm": [(90.0, 50.0), (86.0, 52.0), (88.0, 54.0)],  # 표준 프리셋 (86×52 주의)
+        "bleed_mm": 1.0, "source": "order_IC00001 / 용지 스노우지 작업92×52=재단90×50",
+    },
+    "postcard": {  # 엽서
+        "mode": "free_input",
+        "min_mm": (85.0, 45.0), "max_mm": (150.0, 100.0),
+        "source": "order_IC00113",
+    },
+    "memopad": {  # 떡메모지 (재단 기준)
+        "sizes_mm": [(80, 80), (90, 90), (100, 100), (100, 90), (106, 80),
+                     (100, 140), (146.5, 210), (210, 297), (50, 140), (70, 180), (85, 190)],
+        "bleed_mm": 2.0, "safety_mm": 2.0, "source": "order_IC00025",
+    },
+    "flyer": {  # 전단·포스터 공통 A/B 시리즈 (재단)
+        "sizes_mm": [(600, 900), (420, 600), (297, 420), (210, 297), (146, 210), (103, 146),
+                     (520, 760), (370, 520), (257, 368), (182, 257), (128, 182), (90, 128)],
+        "bleed_mm": 2.0, "safety_mm": 2.0, "source": "order_IC00017/IC00018 / guide_02_14",
+    },
+    "sticker_square": {  # 사각재단 스티커 (재단)
+        "sizes_mm": [(50, 50), (80, 50), (90, 55), (90, 70), (90, 90), (90, 100), (90, 150)],
+        "bleed_mm": 3.0, "source": "order_IC00030",
+    },
+    "sticker_diecut": {  # 도무송 스티커: 칼선=재단-3mm, 편집=재단+3mm
+        "sizes_mm": [(53, 32), (50, 50), (80, 50), (90, 55)],
+        "bleed_mm": 3.0, "dieline_inset_mm": 3.0, "min_diecut_mm": 10.0,
+        "source": "order_IC00031 / thomson_guide",
+    },
+}
+
+#: 도무송(칼선) 규칙 — 톰슨 가이드 OCR 확정
+DIELINE_RULES = {
+    "color": "K100",                 # 칼선은 검정 100% (명명 별색 아님)
+    "min_size_mm": 10.0,             # 도무송 최소 10mm
+    "gap_mm": 3.0,                   # 도형 간 최소 간격 3mm
+    "sticker_inset_mm": 3.0,         # 스티커: 칼선=재단-사방3mm
+    "files": ["도무송 위치용", "인쇄용 앞(칼선 색없음)", "인쇄용 뒤", "도무송 도안(K100)"],
+    "source": "dieline_download",    # guide_03_03 톰슨 가이드
+}
+
+
 @dataclass(frozen=True)
 class ProductRule:
     """품목별 검수 임계값. None이면 체크가 기본값을 쓴다.
@@ -72,17 +119,17 @@ PRODUCT_RULES: dict[str, ProductRule] = {
     # 명함: 인디자인 '명함류 1mm', 품목별 안전여백 2mm, 0.5pt 미만 먹1도
     "namecard": ProductRule(
         bleed_mm=1.0, safety_mm=2.0, max_ink_percent=300.0, min_line_pt=0.5,
-        source="namecard", note="인디자인 도련 1mm / 명함 가이드 안전여백 2mm",
+        source="namecard", note="인디자인 도련 1mm / 명함 안전여백 2mm (TAC 300%는 가이드 미명시 표준)",
     ),
-    # 전단: 전단지류 도련 2mm, 총잉크량 250%
+    # 전단: 규격표 확인(A4 재단210×297 / 안전206×293 / 편집214×301) → 도련 2mm·안전 2mm, TAC 250%
     "flyer": ProductRule(
-        bleed_mm=2.0, safety_mm=3.0, max_ink_percent=250.0, min_line_pt=0.5,
-        source="flyer", note="전단 도련 2mm / CMYK 총합 250% 이하(당일판)",
+        bleed_mm=2.0, safety_mm=2.0, max_ink_percent=250.0, min_line_pt=0.5,
+        source="flyer", note="전단 규격표 확인: 도련 2mm·안전여백 2mm / CMYK 총합 250% 이하",
     ),
-    # 포스터: 전단과 같은 카테고리(let)
+    # 포스터: 전단과 같은 규격표(A/B 시리즈)
     "poster": ProductRule(
-        bleed_mm=2.0, safety_mm=3.0, max_ink_percent=250.0, min_line_pt=0.5,
-        source="flyer", note="전단/포스터 도련 2mm / 총잉크 250%",
+        bleed_mm=2.0, safety_mm=2.0, max_ink_percent=250.0, min_line_pt=0.5,
+        source="flyer", note="포스터 규격표 확인: 도련 2mm·안전 2mm / 총잉크 250%",
     ),
     # 스티커(사각): 도련 3mm, 안전여백 2mm, 테두리 재단선 안쪽 3mm
     "sticker": ProductRule(
@@ -90,20 +137,21 @@ PRODUCT_RULES: dict[str, ProductRule] = {
         diecut_outer_mm=3.0, source="sticker",
         note="스티커 도련 3mm / 사각 안전여백 2mm(도무송 3mm) / 정재단 칼선+3mm",
     ),
-    # 라벨: 스티커에 준함
+    # 라벨: 가이드에 독립 항목 없음 — 스티커 규칙 준용(추론). TAC 300은 가이드 미명시 표준.
     "label": ProductRule(
         bleed_mm=3.0, safety_mm=2.0, max_ink_percent=300.0, min_line_pt=0.5,
-        diecut_outer_mm=3.0, source="sticker", note="라벨=스티커 규칙 준용",
+        diecut_outer_mm=3.0, guide_confirmed=False, source="sticker",
+        note="라벨=스티커 규칙 준용(가이드 독립 항목 없음) / TAC 300%는 가이드 미명시 표준",
     ),
     # 엽서: 낱장 인쇄물(전단류에 준함) — 도련 수치 가이드 이미지 기반, 표준 2mm
     "postcard": ProductRule(
         bleed_mm=2.0, safety_mm=3.0, max_ink_percent=300.0, min_line_pt=0.5,
         guide_confirmed=False, source="flyer", note="엽서 규격 크기·도련은 가이드 이미지 기반(표준 추정)",
     ),
-    # 떡메모지: K100→K99 등 공통, 도련·규격은 이미지 기반(표준 추정)
+    # 떡메모지: 주문 규격표 확인(재단80×80 / 안전76×76 / 편집84×84) → 도련 2mm·안전 2mm
     "memopad": ProductRule(
         bleed_mm=2.0, safety_mm=2.0, max_ink_percent=300.0, min_line_pt=0.5,
-        guide_confirmed=False, source="memopad", note="떡메모지 규격·도련은 가이드 이미지 기반(표준 추정)",
+        source="memopad", note="떡메모지 규격표 확인: 재단80×80/안전76×76/편집84×84 → 도련 2mm·안전 2mm",
     ),
     # 포토카드: 가이드에 별도 항목 없음 — 표준 추정
     "photocard": ProductRule(
@@ -170,7 +218,7 @@ REMEDIATION: dict[str, Remediation] = {
             "photoshop": "이미지 > 모드 > CMYK 색상. 컬러 프로파일은 'CMYK Japan Color 2001 Coated'.",
             "indesign": "색상은 C·M·Y·K 수치로 지정. 별색(PANTONE)은 색상 유형을 '원색(CMYK)'으로 변환.",
         },
-        autofixable=True,  # DeviceRGB → CMYK 근사 변환 (색 변화 고지)
+        autofixable=False,  # RGB→CMYK 자동 변환은 색 왜곡 위험 → 자동 적용하지 않음(안내만)
         source="photoshop",
     ),
     "resolution": Remediation(
@@ -230,7 +278,10 @@ REMEDIATION: dict[str, Remediation] = {
         rule="일반 텍스트는 K100(먹1도). C·M·Y 섞인 4도 블랙은 핀이 어긋나 번져 보임",
         why="검정 글씨에 다른 색이 섞이면 인쇄 핀이 어긋나 글자가 겹쳐 흐리게 나와요.",
         how_to_fix={
-            "common": "검정 텍스트를 K100(먹1도)으로 바꿔 주세요. 넓은 검정 배경은 K100+C10(진한 검정) 권장.",
+            "common": (
+                "검정 텍스트는 K100(먹1도)으로. 넓은 검정 배경은 K100+C10(진한 검정) 권장. "
+                "K100은 자동 오버프린트되니, 배경 위 검정이 사라지지 않게 하려면 K99 또는 K100+C1로."
+            ),
         },
         autofixable=False,
         source="indesign",

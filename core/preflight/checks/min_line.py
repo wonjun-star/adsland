@@ -32,7 +32,9 @@ def check_min_line(ctx: CheckContext) -> CheckResult:
     warn 등급이라 주문을 막지는 않고, 얇은 선을 고지만 한다.
     """
     min_pt = (
-        ctx.order.min_line_pt if (ctx.order and ctx.order.min_line_pt) else MIN_LINE_PT
+        ctx.order.min_line_pt
+        if (ctx.order and ctx.order.min_line_pt is not None)
+        else MIN_LINE_PT
     )
     try:
         thin: list[dict] = []          # 기준 미달 스트로크 [{"page", "width_pt"}]

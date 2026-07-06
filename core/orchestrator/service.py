@@ -622,9 +622,9 @@ class IntakeService:
         fixed = src.parent / f"{src.stem}_fixed.pdf"
         pv_dir = PREVIEW_DIR / session_id
         # 품목별 요구 도련만큼 보정 (명함 1mm / 전단 2mm / 스티커 3mm)
-        from core.preflight.adsland_guide import rule_for
+        from core.preflight.adsland_guide import DEFAULT_RULE, rule_for
 
-        bleed_mm = rule_for(row.product).bleed_mm or 3.0
+        bleed_mm = rule_for(row.product).bleed_mm or DEFAULT_RULE.bleed_mm
         fix_result = extend_bleed(src, fixed, bleed_mm=bleed_mm, preview_dir=pv_dir)
         self.store.set_file_path(session_id, str(fixed))
         self.store.record_event(session_id, "autofix_applied", {"check_id": check_id, **fix_result})
