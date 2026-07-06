@@ -36,6 +36,10 @@ SIG_HIGH_QUOTE = "quote_over_threshold"          # 금액 > 30만원
 SIG_PARSE_FAILURES = "llm_parse_failures"        # 스키마 검증 실패 2회 연속
 SIG_NEGATIVE_SENTIMENT = "negative_sentiment"    # 부정 감정 표현 감지
 
+#: uncertain이어도 사람 검판이 아니라 '고객 질문'으로 해소되는 항목 (에스컬레이션 제외).
+#: dieline(칼선 없음)은 재단 형태(사각/도무송)를 고객이 정하면 판정이 확정된다.
+CUSTOMER_RESOLVABLE_UNCERTAIN = frozenset({"dieline"})
+
 # ---------------------------------------------------------------- 관문 차단 사유 상수
 
 BLOCK_PREFLIGHT_MISSING = "preflight_not_run"          # 리포트 자체가 없음
@@ -195,9 +199,12 @@ def escalation_signals(
         if count >= SLOT_CHANGE_LIMIT:
             signals.append(f"{SIG_SLOT_THRASHING}:{slot}")
 
-    # 프리플라이트 uncertain 항목 존재 — 즉시
+    # 프리플라이트 uncertain 항목 존재 — 즉시.
+    # 단, 고객 질문으로 풀리는 항목(dieline=재단 형태 선택)은 사람에게 넘기지 않는다.
     if report is not None:
         for r in report.uncertains:
+            if r.check_id in CUSTOMER_RESOLVABLE_UNCERTAIN:
+                continue
             signals.append(f"{SIG_PREFLIGHT_UNCERTAIN}:{r.check_id}")
 
     # 주문 예상 금액 > 30만원 (임의 초기값)

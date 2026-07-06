@@ -67,10 +67,18 @@ def test_classify_customer_type_b_fix_request():
     assert p.customer_type == CustomerType.B
 
 
-def test_classify_unknown_product_is_none():
+def test_classify_unsupported_product_is_flagged():
+    """애즈랜드가 팔지만 아직 없는 상품(현수막)은 'banner'로 인식 — 조용히 무시하지 않고
+    오케스트레이터가 '준비 중'으로 안내하게 한다. 카탈로그엔 없으므로 unknown_product 처리."""
     p = classify_input("현수막 되나요?", CATALOG, adapter=None)
-    assert p.product is None
+    assert p.product == "banner"
+    assert p.product not in CATALOG
     assert p.customer_type == CustomerType.A
+
+
+def test_classify_truly_unknown_is_none():
+    p = classify_input("우주선 되나요?", CATALOG, adapter=None)
+    assert p.product is None
 
 
 # ---------------------------------------------------------------- 슬롯 파서

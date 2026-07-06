@@ -181,6 +181,7 @@ class IntakeService:
         # 슬롯 제안 적용 (스키마 대조 — 통과한 값만)
         negative = False
         wants_confirm = False
+        order_slot_changed = False  # size/sides/cut_type 등 검판 기준이 바뀌면 재검판
         if proposal is not None:
             negative = proposal.negative_sentiment or proposal.intent == Intent.COMPLAINT
             wants_confirm = proposal.intent == Intent.CONFIRM
@@ -189,11 +190,22 @@ class IntakeService:
                 for name, value in proposal.slots.items():
                     ok, resolved = self._validate_slot_value(schema, name, value)
                     if ok:
+                        before = (row.slots or {}).get(name, {}).get("value")
                         self.store.set_slot(session_id, name, resolved, source="user")
+                        if name in ("size", "sides", "cut_type") and before != resolved:
+                            order_slot_changed = True
                     else:
                         notices.append(f"invalid_value:{name}={value}")
             elif proposal.slots:
                 notices.append("slots_before_product")
+
+        # 검판 기준(재단 형태·크기·인쇄면)이 바뀌었고 파일이 있으면 재검판
+        # → 예: 칼선 없는 스티커에 "사각재단" 답하면 칼선 항목이 통과로 바뀐다 (사람 안 거침)
+        row = self._get(session_id)
+        if order_slot_changed and row.file_path and State(row.state) == State.SLOT_FILLING:
+            self.store.transition(session_id, State.FILE_CHECK, "order_slot_changed_recheck")
+            self._run_preflight(session_id)
+            self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
 
         # 확정 의사가 확정 단계에서 나오면 확정 처리로 위임
         row = self._get(session_id)
@@ -645,10 +657,12 @@ class IntakeService:
         # 파일에서 추론한 사이즈로 파일 자신을 검사하는 것은 무의미하므로 source=inferred는 제외.
         if size_value and (row.slots["size"].get("source") != "inferred"):
             size_mm = choice_to_mm(str(size_value))
+        cut_type = (row.slots or {}).get("cut_type", {}).get("value")
         return OrderContext(
             product=row.product,
             size_mm=size_mm,
             page_count=self._expected_pages(row) if row.product else None,
+            cut_type=cut_type,
         )
 
     def _run_preflight(self, session_id: str) -> PreflightReport:

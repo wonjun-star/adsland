@@ -46,10 +46,12 @@ class OrderContext:
         product: str | None = None,
         size_mm: tuple[float, float] | None = None,  # 재단 규격 (w, h)
         page_count: int | None = None,
+        cut_type: str | None = None,  # square|circle|die_cut — 칼선 필요 여부 판정용
     ):
         self.product = product
         self.size_mm = size_mm
         self.page_count = page_count
+        self.cut_type = cut_type
 
 
 class CheckContext:

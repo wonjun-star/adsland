@@ -164,7 +164,27 @@ def check_dieline(ctx: CheckContext) -> CheckResult:
                         f" (페이지 {pages_with_dieline})"
                     ),
                 )
-            # 칼선 상품인데 칼선 없음 → 전 페이지가 문제 (자유형 재단 여부 질문)
+            # 칼선 상품인데 칼선 없음 → 재단 형태(cut_type)에 따라 판정.
+            # 이건 고객이 정할 문제이므로, 재단 형태를 알면 바로 판정하고 사람에게 넘기지 않는다.
+            cut_type = (getattr(ctx.order, "cut_type", None) or "").strip().lower() if ctx.order else ""
+            if cut_type in ("square", "circle"):
+                return result(
+                    "dieline",
+                    CheckStatus.PASS,
+                    measured=measured,
+                    required=required,
+                    detail=f"칼선 없음 — {cut_type} 재단이라 칼선 불필요",
+                )
+            if cut_type == "die_cut":
+                return result(
+                    "dieline",
+                    CheckStatus.FAIL,
+                    measured=measured,
+                    required=required,
+                    pages=list(range(n_pages)),
+                    detail="도무송(자유형) 재단인데 칼선 별색이 없음 — 칼선을 넣어 다시 업로드 필요",
+                )
+            # 재단 형태 미정 → 고객에게 물어볼 대상 (사람 검판 아님)
             return result(
                 "dieline",
                 CheckStatus.UNCERTAIN,
@@ -172,7 +192,7 @@ def check_dieline(ctx: CheckContext) -> CheckResult:
                 required=required,
                 pages=list(range(n_pages)),
                 detail=(
-                    f"'{product}' 주문인데 칼선 별색 없음 — 사각 재단인지 자유형(칼선 필요)인지 확인 필요"
+                    f"'{product}' 주문인데 칼선 별색 없음 — 사각 재단인지 자유형(칼선 필요)인지 고객 확인"
                     f" (발견 별색: {all_spots if all_spots else '없음'})"
                 ),
             )

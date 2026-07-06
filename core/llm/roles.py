@@ -70,6 +70,13 @@ _PRODUCT_ALIASES: dict[str, tuple[str, ...]] = {
     "photocard": ("포토카드", "포카"),
 }
 
+#: 애즈랜드가 취급하지만 아직 프로토타입에 없는 상품 — 알아채서 '준비 중'이라 안내한다
+#: (조용히 무시하고 이전 상품에 머무르지 않도록). id는 catalog에 없으므로 unknown_product 처리됨.
+_UNSUPPORTED_ALIASES: dict[str, tuple[str, ...]] = {
+    "banner": ("현수막", "배너", "미니배너", "엑스배너", "x배너", "슬로건", "실사출력"),
+}
+UNSUPPORTED_LABELS: dict[str, str] = {"banner": "현수막·배너"}
+
 #: B유형: 파일은 있으나 수정·보완이 필요하다는 표현
 _TYPE_B_RE = re.compile(r"수정|고쳐|고치|보완")
 #: C유형: 시안·디자인을 새로 만들어 달라는 표현 (인접 매칭 — "디자인 파일 확인해주세요" 오탐 방지)
@@ -127,6 +134,15 @@ def _rule_classify(text: str, catalog: dict[str, ProductSchema]) -> ClassifyProp
     product = best[2] if best else None
     if best:
         signals.append(f"product_keyword:{best[3]}")
+
+    # 지원 상품이 안 잡혔으면, 아직 준비 안 된 상품(현수막·배너 등) 요청인지 확인 →
+    # id를 그대로 반환하면 오케스트레이터가 '준비 중'으로 안내한다 (조용히 무시하지 않음)
+    if product is None:
+        for uid, terms in _UNSUPPORTED_ALIASES.items():
+            if any(t in text for t in terms):
+                product = uid
+                signals.append(f"unsupported_product:{uid}")
+                break
 
     # 고객 유형: 수정 요청(B) > 시안 제작 요청(C) > 기본(A)
     if _TYPE_B_RE.search(text):
@@ -935,7 +951,12 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
             line += " " + ", ".join(_label(c) for c in sdef.choices) + " 중에서 골라주시면 돼요."
         return line
     if code.startswith("unknown_product:"):
-        return "말씀하신 상품은 아직 준비 중이에요. 지금은 명함, 스티커, 전단, 포스터, 라벨, 엽서, 떡메모지, 포토카드를 도와드릴 수 있어요."
+        pid = code.split(":", 1)[1]
+        name = UNSUPPORTED_LABELS.get(pid, "말씀하신 상품")
+        return (
+            f"{name}{_eun(name)} 아직 준비 중이에요. 지금은 명함·스티커·전단·포스터·라벨·엽서·떡메모지·포토카드를 "
+            "도와드릴 수 있어요. 다른 상품으로 하시겠어요?"
+        )
     if code.startswith("quote_missing:"):
         axis, _, value = code.split(":", 1)[1].partition("=")
         display = _slot_display(axis, schema)
@@ -1075,6 +1096,12 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
     if d.offer_design and not d.design_generated:
         parts.append("파일이 있으면 올려주시고, 없으시면 이름·회사·직위·연락처를 주시면 시안을 만들어드려요.")
 
+    # 안내 코드(무효값·준비 안 된 상품 등)는 결과보다 먼저 — 요청에 대한 직접 응답이므로
+    for code in d.notices:
+        line = _notice_line(code, schema)
+        if line:
+            parts.append(line)
+
     # 검판 결과 — 한 줄 (상세는 카드)
     if d.report is not None and d.kind in ("upload", "autofix"):
         parts.append(_report_summary_line(d.report, set(d.offer_autofix)))
@@ -1086,12 +1113,6 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
     if d.quote is not None and not d.quote.missing:
         prefix = "예상 견적" if d.estimate else "견적"
         parts.append(f"{prefix} {_won(d.quote.total)} (부가세 포함).")
-
-    # 안내 코드 (무효값·가격표 밖 수량 등)
-    for code in d.notices:
-        line = _notice_line(code, schema)
-        if line:
-            parts.append(line)
 
     # 충돌 확인 (간결)
     for c in d.conflicts:
