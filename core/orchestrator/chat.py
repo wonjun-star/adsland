@@ -190,9 +190,13 @@ class ChatPipeline:
                 # 검증 실패는 세션에 누적 — policy의 llm_parse_failures 시그널 입력이 된다
                 self.service.store.record_llm_parse_failure(session_id)
                 continue
+            except Exception:
+                # API 오류(요청 오류·레이트리밋·네트워크 등)에도 대화가 끊기지 않게 규칙으로 폴백
+                self.service.store.record_llm_parse_failure(session_id)
+                break
             self.service.store.reset_llm_parse_failures(session_id)
             return proposal
-        return rule()  # 2회 연속 실패 → 규칙 폴백으로 계속 진행 (카운트는 시그널로 남음)
+        return rule()  # 실패 → 규칙 폴백으로 계속 진행 (카운트는 시그널로 남음)
 
     def _render(self, result: TurnResult, adapter: LLMAdapter | None) -> str:
         """directives → 응답 문장. 어떤 실패도 사용자에게 원문 예외로 노출하지 않는다."""

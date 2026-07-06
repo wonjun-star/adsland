@@ -13,10 +13,10 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 
-#: 역할별 모델 티어. 분류·슬롯파싱은 소형, 대화 생성은 중형.
+#: 역할별 모델 — 사용자 요청으로 전 역할 Sonnet 5 (환경변수로 개별 override 가능).
 TIER_MODELS: dict[str, str] = {
-    "classify": os.environ.get("MODEL_CLASSIFY", "claude-haiku-4-5-20251001"),
-    "parse": os.environ.get("MODEL_PARSE", "claude-haiku-4-5-20251001"),
+    "classify": os.environ.get("MODEL_CLASSIFY", "claude-sonnet-5"),
+    "parse": os.environ.get("MODEL_PARSE", "claude-sonnet-5"),
     "dialog": os.environ.get("MODEL_DIALOG", "claude-sonnet-5"),
 }
 
@@ -47,14 +47,18 @@ class AnthropicAdapter(LLMAdapter):
         messages: list[dict[str, str]],
         role: str = "dialog",
         max_tokens: int = 1024,
-        temperature: float = 0.2,
+        temperature: float | None = None,
     ) -> str:
+        # Sonnet 5 등 최신 모델은 temperature를 받지 않는다(deprecated) → 지정된 경우에만 전달
+        kwargs: dict = {}
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         resp = self._client.messages.create(
             model=TIER_MODELS[role],
             system=system,
             messages=messages,
             max_tokens=max_tokens,
-            temperature=temperature,
+            **kwargs,
         )
         return "".join(b.text for b in resp.content if b.type == "text")
 

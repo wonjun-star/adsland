@@ -946,7 +946,6 @@ def render_reply(
             [{"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)}],
             role="dialog",
             max_tokens=800,
-            temperature=0.6,
         )
         reply = raw.strip()
         if not reply:
