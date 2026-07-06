@@ -1008,6 +1008,12 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
         return line
     if code.startswith("design_unsupported:"):
         return "시안 자동 생성은 지금 명함만 지원해요. 다른 상품은 완성된 파일을 올려주시면 도와드릴게요."
+    if code.startswith("custom_size_estimate:"):
+        _, size, near = code.split(":", 2)
+        return (
+            f"파일이 {size.replace('x', '×')}mm 맞춤 규격이라, 가까운 {near.replace('x', '×')}mm 기준 "
+            "예상 금액이에요. 정확한 맞춤 견적은 담당자가 확정해드려요. 이 규격 그대로 진행할까요?"
+        )
     if code == "slots_before_product":
         return "상품이 정해지면 말씀해 주신 사양을 바로 반영해드릴게요."
     if code == "file_received_need_product":

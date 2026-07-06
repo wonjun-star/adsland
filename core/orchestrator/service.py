@@ -876,9 +876,41 @@ class IntakeService:
                 else:
                     return None
         q = quote(row.product, values)
-        if q is None or q.missing:
+        if q is not None and not q.missing:
+            return q
+        # 크기가 표준 규격에 없으면(맞춤 규격 파일 등) 가장 가까운 규격으로 예상가를 낸다.
+        # → 대화가 "규격 골라주세요"로 막히지 않고 대략적 가격이라도 나온다.
+        near = self._nearest_size_choice(schema, values.get("size"))
+        if near and near != values.get("size"):
+            values2 = dict(values)
+            values2["size"] = near
+            q2 = quote(row.product, values2)
+            if q2 is not None and not q2.missing:
+                return q2
+        return None
+
+    def _nearest_size_choice(self, schema: ProductSchema, size_value) -> str | None:
+        """주어진 크기에 가장 가까운 카탈로그 사이즈 선택지 (비례 거리 기준)."""
+        size_def = schema.slots.get("size")
+        if not size_def or not size_def.choices or not size_value:
             return None
-        return q
+        target = choice_to_mm(str(size_value))
+        if not target:
+            return None
+        tw, th = target
+        best: tuple[float, str] | None = None
+        for choice in size_def.choices:
+            cm = choice_to_mm(str(choice))
+            if not cm:
+                continue
+            cw, ch = cm
+            d = min(
+                abs(tw - cw) / cw + abs(th - ch) / ch,
+                abs(tw - ch) / ch + abs(th - cw) / cw,
+            )
+            if best is None or d < best[0]:
+                best = (d, str(choice))
+        return best[1] if best else None
 
     def _build_changes(self, session_id: str) -> list[dict]:
         """이벤트 로그에서 '접수본 → 최종본' 변경 항목을 뽑는다 (검판원·고객 공용).
@@ -1002,7 +1034,17 @@ class IntakeService:
                     {"total": quote_result.total, "missing": quote_result.missing},
                 )
                 if quote_result.missing:
-                    d.notices.extend(f"quote_missing:{m}" for m in quote_result.missing)
+                    # 맞춤 규격(비표준 size)은 custom_size_estimate가 따로 설명하므로
+                    # "가격표에 없어요" 안내를 중복·반복하지 않는다.
+                    size_def = schema.slots.get("size")
+                    size_val = (row.slots or {}).get("size", {}).get("value")
+                    custom_size = bool(
+                        size_def and size_val and str(size_val) not in {str(c) for c in size_def.choices}
+                    )
+                    for m in quote_result.missing:
+                        if m.startswith("size=") and custom_size:
+                            continue
+                        d.notices.append(f"quote_missing:{m}")
                     quote_result = None  # 조회 실패한 견적은 표시하지 않는다
                 else:
                     d.quote = quote_result
@@ -1013,6 +1055,19 @@ class IntakeService:
             if est is not None:
                 d.quote = est
                 d.estimate = True
+                # 파일 크기가 비표준이라 가까운 규격으로 예상가를 낸 경우 알려준다
+                # (파일 관련 턴에만 — 매 턴 반복 방지)
+                size_val = (row.slots or {}).get("size", {}).get("value")
+                size_def = schema.slots.get("size")
+                if (
+                    kind in ("upload", "autofix", "design")
+                    and size_def
+                    and size_val
+                    and str(size_val) not in {str(c) for c in size_def.choices}
+                ):
+                    near = self._nearest_size_choice(schema, size_val)
+                    if near:
+                        d.notices.append(f"custom_size_estimate:{size_val}:{near}")
 
         # 변경 이력 (접수본 → 최종본) — 자동 보정 등이 적용됐으면 채워진다
         d.changes = self._build_changes(session_id)
