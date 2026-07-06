@@ -354,6 +354,8 @@ function OrderConfirmedCard({ card }) {
   const slots = summary.slots || {}
   const finalUrl = fileUrl(card.final_url)
   const changes = card.changes || []
+  // 명함은 최종 확정본을 3D로 돌려볼 수 있게 (그 외 상품·파일 없음이면 평면 이미지)
+  const show3D = summary.product === 'namecard' && Boolean(card.final_url)
   return (
     <div className="card order-confirmed">
       <div className="order-head">
@@ -374,10 +376,17 @@ function OrderConfirmedCard({ card }) {
 
       {(finalUrl || card.file_name) && (
         <div className="order-final">
-          {finalUrl && (
-            <div className="preview-frame single">
-              <img src={finalUrl} alt="최종 확정본 미리보기" />
-            </div>
+          {show3D ? (
+            <>
+              <CardViewer3D previewUrl={card.final_url} label="최종 확정본 3D 미리보기" />
+              <p className="design-hint">드래그해서 돌려보세요</p>
+            </>
+          ) : (
+            finalUrl && (
+              <div className="preview-frame single">
+                <img src={finalUrl} alt="최종 확정본 미리보기" />
+              </div>
+            )
           )}
           {card.file_name && (
             <div className="order-file">
