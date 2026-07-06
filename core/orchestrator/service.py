@@ -327,7 +327,7 @@ class IntakeService:
         if merged_back:
             notices.insert(0, "back_side_merged")
         if size_from_file:
-            notices.insert(0, f"size_from_file:{size_from_file}")
+            notices.insert(0, size_from_file)  # 이미 완성된 코드 (size_from_file:.. 또는 size_snapped:..)
         result = self._advance(session_id, notices=notices, kind="upload", report=report)
         if detected:
             result.directives.detected_product = self.catalog[detected].display_name
@@ -358,15 +358,52 @@ class IntakeService:
         if not size:
             return None
         w, h = size
-        match = match_size_choice(schema, w, h)
-        value = match or f"{round(w)}x{round(h)}"
+        match = match_size_choice(schema, w, h)  # 정확 일치 (±1mm)
+        snapped = None
+        if match is None:
+            # 규격 + 재단여백 범위면 그 표준 규격으로 스냅 (예: 53x94 → 90x50 명함).
+            # 인쇄 파일은 재단선 밖 여백을 두는 게 정상이라, 몇 mm 큰 건 '문제'가 아니다.
+            snapped = self._bleed_tolerant_match(schema, w, h)
+        value = match or snapped or f"{round(w)}x{round(h)}"
         entry = (row.slots or {}).get("size", {})
         prev = entry.get("value")
         if prev == value:
             return None
         self.store.set_slot(session_id, "size", value, source="file")
+        if snapped is not None:
+            # 파일이 표준규격 + 재단여백 → 그 표준규격으로 맞췄다고 한 번 알린다
+            return f"size_snapped:{round(w)}x{round(h)}:{value}"
         # 이전에 사람이 고른 값이 있었는데 파일이 다르면 알려준다 (조용히 바꾸지 않음)
-        return value if prev is not None and entry.get("source") in ("user", "default") else None
+        if prev is not None and entry.get("source") in ("user", "default"):
+            return f"size_from_file:{value}"
+        return None
+
+    def _bleed_tolerant_match(self, schema: ProductSchema, w: float, h: float) -> str | None:
+        """파일이 '표준 규격 + 재단여백' 범위 안이면 그 표준 규격 선택지를 돌려준다.
+
+        규격보다 큰 쪽은 넉넉히(재단여백 ≈4mm/변까지), 작은 쪽은 반올림 오차만 허용.
+        여러 규격이 걸리면 가장 가까운 것. (page_size 체크의 허용치와 같은 취지)
+        """
+        size_slot = schema.slots.get("size")
+        if not size_slot or not size_slot.choices:
+            return None
+        over, under = 8.0, 1.0
+
+        def fits(dim: float, target: float) -> bool:
+            return (target - under) <= dim <= (target + over)
+
+        best: tuple[float, str] | None = None
+        for choice in size_slot.choices:
+            cm = choice_to_mm(str(choice))
+            if not cm:
+                continue
+            cw, ch = cm
+            if not ((fits(w, cw) and fits(h, ch)) or (fits(w, ch) and fits(h, cw))):
+                continue
+            d = min(abs(w - cw) + abs(h - ch), abs(w - ch) + abs(h - cw))
+            if best is None or d < best[0]:
+                best = (d, str(choice))
+        return best[1] if best else None
 
     def _infer_product_from_file(self, file_path: Path) -> str | None:
         """파일을 보고 '무엇을 만들려는지' 추정한다 (정확 매칭이 아니라 넉넉한 의도 추정).

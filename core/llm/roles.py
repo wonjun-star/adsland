@@ -1033,6 +1033,12 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
     if code.startswith("size_from_file:"):
         val = code.split(":", 1)[1]
         return f"파일 크기가 {val.replace('x', '×')}mm네요 — 이 크기 그대로 진행할게요. 다른 규격을 원하시면 알려주세요."
+    if code.startswith("size_snapped:"):
+        _, filesz, std = code.split(":", 2)
+        return (
+            f"파일이 {filesz.replace('x', '×')}mm인데, 표준 {std.replace('x', '×')}mm에 "
+            "재단여백을 더한 크기예요. 문제 없어서 그대로 진행할게요."
+        )
     return None  # quote_missing 등 내부 코드는 질문/에스컬레이션이 따로 안내한다
 
 

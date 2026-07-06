@@ -18,8 +18,14 @@ from typing import Any
 from core.preflight.engine import CheckContext, pt_to_mm, register_check, result
 from core.preflight.report import CheckResult, CheckStatus
 
-#: 허용 오차 (mm) — PLAN §6: 주문 규격과 일치(±0.5mm)
+#: 허용 오차 (mm) — 페이지 간 일관성 비교용 (±0.5mm)
 TOLERANCE_MM = 0.5
+
+#: 주문 규격 대조는 '재단여백(bleed)'을 감안한다 — 파일이 규격보다 이만큼 크면
+#: '규격 + 재단여백'으로 보고 통과. (인쇄용 파일은 재단선 밖으로 3~4mm 여백을 두는 게 정상)
+#: 규격보다 큰 쪽은 넉넉히(≈4mm/변), 작은 쪽은 반올림 오차만 허용.
+BLEED_OVER_MM = 8.0
+UNDER_MM = 1.0
 
 
 def _near(a: float, b: float) -> bool:
@@ -31,6 +37,11 @@ def _same_size(a: tuple[float, float], b: tuple[float, float]) -> bool:
     a_lo, a_hi = sorted(a)
     b_lo, b_hi = sorted(b)
     return _near(a_lo, b_lo) and _near(a_hi, b_hi)
+
+
+def _fits_order(dim: float, target: float) -> bool:
+    """파일 한 변이 주문 규격과 맞는가 — 같거나, 재단여백만큼 큰 것까지 허용."""
+    return (target - UNDER_MM) <= dim <= (target + BLEED_OVER_MM)
 
 
 @register_check("page_size")
@@ -119,27 +130,34 @@ def _check(ctx: CheckContext) -> CheckResult:
     ow, oh = float(order_size[0]), float(order_size[1])
     measured["order_size_mm"] = [ow, oh]
 
-    # 페이지별 주문 규격 대조 (정방향 또는 가로세로 교환 일치 허용)
+    # 페이지별 주문 규격 대조 (정방향 또는 가로세로 교환 일치 허용, 재단여백 감안)
     mismatch_pages: list[int] = []
     for i, (w, h), _ in per_page:
-        direct = _near(w, ow) and _near(h, oh)
-        swapped = _near(w, oh) and _near(h, ow)
+        direct = _fits_order(w, ow) and _fits_order(h, oh)
+        swapped = _fits_order(w, oh) and _fits_order(h, ow)
         if not (direct or swapped):
             mismatch_pages.append(i)
 
     # 대표(첫) 페이지가 교환 일치로만 맞으면 회전 배치로 기록
-    ref_direct = _near(ref_size[0], ow) and _near(ref_size[1], oh)
-    ref_swapped = _near(ref_size[0], oh) and _near(ref_size[1], ow)
+    ref_direct = _fits_order(ref_size[0], ow) and _fits_order(ref_size[1], oh)
+    ref_swapped = _fits_order(ref_size[0], oh) and _fits_order(ref_size[1], ow)
     if ref_swapped and not ref_direct:
         measured["rotated"] = True
         notes.append("가로세로가 주문과 뒤바뀐 상태로 일치 (회전 배치로 간주)")
+    # 규격보다 큰 경우(재단여백 포함)는 measured에 남겨 오더지·검판원이 알 수 있게
+    if (ref_direct or ref_swapped) and (
+        ref_size[0] > ow + TOLERANCE_MM or ref_size[1] > oh + TOLERANCE_MM
+        or ref_size[0] > oh + TOLERANCE_MM or ref_size[1] > ow + TOLERANCE_MM
+    ):
+        measured["includes_bleed"] = True
+        notes.append("재단선 밖 여백을 포함한 크기 (규격 + 재단여백으로 간주)")
 
     problem_pages = sorted(set(inconsistent) | set(mismatch_pages))
     if problem_pages:
         if per_page[0][0] in mismatch_pages:
             notes.append(
                 f"재단 크기 {measured['file_size_mm'][0]}x{measured['file_size_mm'][1]}mm ≠ "
-                f"주문 {ow:g}x{oh:g}mm (허용 ±{TOLERANCE_MM}mm)"
+                f"주문 {ow:g}x{oh:g}mm (재단여백 감안해도 차이가 큼)"
             )
         # 크기 불일치는 자동 보정 불가 — 재업로드/주문 변경 확인 질문 대상
         return result(

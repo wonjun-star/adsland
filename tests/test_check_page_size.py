@@ -108,14 +108,29 @@ def test_within_tolerance_passes(tmp_path):
     assert r.status == CheckStatus.PASS, r.detail
 
 
-def test_beyond_tolerance_fails(tmp_path):
-    """오차 0.6mm > 0.5mm → fail, 문제 페이지 [0]."""
-    p = _make_pdf(tmp_path / "far.pdf", [(90.6, 50.0)])
+def test_undersized_fails(tmp_path):
+    """규격보다 작으면(재단 후 흰 여백) fail — 이건 진짜 문제다."""
+    p = _make_pdf(tmp_path / "small.pdf", [(85.0, 50.0)])
     r = _run(p, OrderContext(size_mm=(90.0, 50.0)))
     assert r.status == CheckStatus.FAIL
     assert r.pages == [0]
-    assert r.measured["file_size_mm"] == [90.6, 50.0]
-    assert r.required["tolerance_mm"] == 0.5
+    assert r.measured["file_size_mm"] == [85.0, 50.0]
+
+
+def test_much_larger_fails(tmp_path):
+    """재단여백으로 볼 수 없을 만큼 크면 fail (규격 + 8mm 초과)."""
+    p = _make_pdf(tmp_path / "big.pdf", [(100.0, 60.0)])
+    r = _run(p, OrderContext(size_mm=(90.0, 50.0)))
+    assert r.status == CheckStatus.FAIL
+    assert r.pages == [0]
+
+
+def test_larger_by_bleed_passes(tmp_path):
+    """규격 + 재단여백(≈3mm/변)만큼 큰 건 정상 인쇄 파일 → pass, includes_bleed 표시."""
+    p = _make_pdf(tmp_path / "bleed.pdf", [(96.0, 56.0)])
+    r = _run(p, OrderContext(size_mm=(90.0, 50.0)))
+    assert r.status == CheckStatus.PASS, r.detail
+    assert r.measured.get("includes_bleed") is True
 
 
 def test_rotated_match_passes_with_flag(tmp_path):
