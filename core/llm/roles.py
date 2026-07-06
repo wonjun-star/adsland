@@ -1102,6 +1102,37 @@ def _changes_line(changes: list) -> str:
     return "적용한 변경: " + ", ".join(labels) + "."
 
 
+def _slot_choice_answer(schema: ProductSchema | None, slot: str, intro: str) -> str | None:
+    """해당 슬롯의 선택지를 '~는 A, B, C가 있어요'로. 없으면 None."""
+    sdef = schema.slots.get(slot) if schema else None
+    if not sdef or not sdef.choices:
+        return None
+    opts = ", ".join(_label(c) for c in sdef.choices)
+    return f"{intro} {opts}가 있어요."
+
+
+def _answer_question(question: str, schema: ProductSchema | None, d: "ReplyDirectives") -> str | None:
+    """고객 질문에 카탈로그 데이터로 답한다 (규칙 폴백). 답 못 하면 None."""
+    q = question
+    if re.search(r"용지|종이|재질|원단", q):
+        return _slot_choice_answer(schema, "material", "용지는")
+    if re.search(r"사이즈|규격|크기", q):
+        return _slot_choice_answer(schema, "size", "사이즈는") or "규격은 파일 크기에 맞춰 진행해요."
+    if re.search(r"코팅|라미", q):
+        return _slot_choice_answer(schema, "coating", "코팅은")
+    if re.search(r"후가공|마감|고리|로프", q):
+        return _slot_choice_answer(schema, "finishing", "후가공은")
+    if re.search(r"양면|단면|인쇄면", q):
+        return _slot_choice_answer(schema, "sides", "인쇄면은")
+    if re.search(r"재단|도무송|모양", q):
+        return _slot_choice_answer(schema, "cut_type", "재단은")
+    if re.search(r"얼마|가격|견적|비용", q) and d.quote is not None and not d.quote.missing:
+        return f"견적은 부가세 포함 {_won(d.quote.total)}이에요."
+    if re.search(r"며칠|기간|납기|언제|얼마나\s*걸", q) and d.quote is not None and getattr(d.quote, "lead_time", ""):
+        return f"제작은 영업일 {d.quote.lead_time}일 정도 걸려요."
+    return None
+
+
 def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchema | None) -> str:
     """결과 우선·최소 대화 템플릿 — 상세는 카드가, 말은 짧게.
 
@@ -1122,6 +1153,12 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
         return " ".join(parts)
 
     parts: list[str] = []
+
+    # 고객 질문에 먼저 답한다 (자기 흐름보다 우선)
+    if getattr(d, "customer_question", ""):
+        ans = _answer_question(d.customer_question, schema, d)
+        if ans:
+            parts.append(ans)
 
     # 파일을 보고 상품을 추정했으면 '제안'으로 먼저 말한다 (틀리면 고객이 바로잡음)
     if getattr(d, "detected_product", ""):
@@ -1169,12 +1206,14 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
         else:
             parts.append(_question_line(q, schema))
 
-    # 확정 단계 — 검토 → 최종본 → 진행
-    if d.awaiting_confirm:
+    # 확정 단계 — 검토 → 최종본 → 진행. (단, 고객이 질문한 턴엔 확정 재촉하지 않는다)
+    if d.awaiting_confirm and not getattr(d, "customer_question", ""):
         if d.changes:
             parts.append("검토 결과를 반영한 최종본이에요. 이대로 진행할까요?")
         else:
             parts.append("검판 통과했어요. 이대로 진행할까요?")
+    elif d.awaiting_confirm and getattr(d, "customer_question", ""):
+        parts.append("바꾸실 거면 말씀해주시고, 괜찮으시면 이대로 진행할게요.")
 
     if d.gate_blockers:
         parts.append("확정 전에 남은 항목: " + ", ".join(_blocker_line(b) for b in d.gate_blockers))

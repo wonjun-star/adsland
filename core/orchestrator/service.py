@@ -118,6 +118,7 @@ class ReplyDirectives(BaseModel):
     changes: list[dict] = Field(default_factory=list)  # 접수본→최종본 변경 항목
     detected_product: str = ""               # 파일 규격으로 상품을 알아챘을 때 표시명
     offer_back_side: bool = False            # 앞면만 올린 명함류 → 뒷면(양면) 확인
+    customer_question: str = ""              # 고객이 던진 질문 (용지·사이즈·가격 등) → 답해야 함
 
 
 class TurnResult(BaseModel):

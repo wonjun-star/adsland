@@ -23,7 +23,7 @@ from typing import Callable, TypeVar
 from core.design.schema import DESIGNABLE_PRODUCTS, CardContent
 from core.llm import roles
 from core.llm.adapter import LLMAdapter, get_adapter
-from core.llm.parsing import ClassifyProposal, CustomerType, ParseError, SlotProposal
+from core.llm.parsing import ClassifyProposal, CustomerType, Intent, ParseError, SlotProposal
 from core.orchestrator.service import IntakeService, TurnResult
 from core.orchestrator.state_machine import State
 
@@ -99,6 +99,9 @@ class ChatPipeline:
         )
 
         result = self.service.apply_turn(session_id, classify=classify, proposal=proposal)
+        # 고객이 질문을 했으면(용지·사이즈·가격 등) 응답에서 답하도록 원문을 넘긴다
+        if proposal is not None and proposal.intent == Intent.QUESTION:
+            result.directives.customer_question = text
         return result, self._render(result, adapter)
 
     def _maybe_design(
