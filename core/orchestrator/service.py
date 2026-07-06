@@ -735,23 +735,64 @@ class IntakeService:
             "fields": {k: v for k, v in (row.card_content or {}).items() if v},
         }
 
-    def _render_preview_png(self, pdf_path: Path, session_id: str, scale: float = 2.5) -> str | None:
-        """PDF 1페이지 → 미리보기 PNG (pdfium). previews 디렉터리에 저장."""
+    def _render_preview_png(
+        self,
+        pdf_path: Path,
+        session_id: str,
+        scale: float = 2.5,
+        page: int = 0,
+        orient_landscape: bool = False,
+    ) -> str | None:
+        """PDF 한 페이지 → 미리보기 PNG (pdfium). previews 디렉터리에 저장.
+
+        orient_landscape: 세로로 렌더된 페이지(명함 등 가로 규격인데 파일이 세로)는 90° 돌려
+        가로로 맞춘다 — 3D·평면 어디서든 규격 방향(90×50)대로 보이게. (표시용, 원본 PDF는 그대로)
+        """
         try:
             import pypdfium2 as pdfium
+            from PIL import Image
 
             out_dir = PREVIEW_DIR / session_id
             out_dir.mkdir(parents=True, exist_ok=True)
-            out = out_dir / f"{pdf_path.stem}_preview.png"
+            suffix = f"_p{page}" if page else ""
+            out = out_dir / f"{pdf_path.stem}{suffix}_preview.png"
             doc = pdfium.PdfDocument(str(pdf_path))
             try:
-                img = doc[0].render(scale=scale).to_pil()
+                if page >= len(doc):
+                    return None
+                img = doc[page].render(scale=scale).to_pil()
             finally:
                 doc.close()
+            if orient_landscape and img.height > img.width:
+                # 세로 파일 → 가로 규격에 맞춰 90° 회전 (반시계)
+                img = img.transpose(Image.Transpose.ROTATE_90)
             img.save(out)
             return str(out)
         except Exception:
             return None
+
+    def _card_previews(self, row: OrderSession, session_id: str) -> tuple[str | None, str | None]:
+        """확정 카드·최종 확인 3D용 앞/뒷면 미리보기. 명함은 가로 규격에 맞춰 회전."""
+        if not row.file_path:
+            return None, None
+        landscape = row.product == "namecard"
+        front = self._render_preview_png(
+            Path(row.file_path), session_id, page=0, orient_landscape=landscape
+        )
+        back = None
+        try:
+            import pypdfium2 as pdfium
+
+            doc = pdfium.PdfDocument(str(row.file_path))
+            n_pages = len(doc)
+            doc.close()
+        except Exception:
+            n_pages = 1
+        if n_pages >= 2:
+            back = self._render_preview_png(
+                Path(row.file_path), session_id, page=1, orient_landscape=landscape
+            )
+        return front, back
 
     def confirm(self, session_id: str) -> TurnResult:
         """고객 확정 → 3중 관문 → 통과 시 결제 목업 → 주문 완료."""
@@ -778,19 +819,21 @@ class IntakeService:
         row = self._get(session_id)
         quote_result = self._quote(row)
         changes = self._build_changes(session_id)
-        final_preview = self._render_preview_png(Path(row.file_path), session_id) if row.file_path else None
+        front_preview, back_preview = self._card_previews(row, session_id)
         d = ReplyDirectives(kind="confirm", order_no=order_no, quote=quote_result, changes=changes)
         cards = [
             {
                 # 발주·생산 인계 명세 — 무엇을 받는지 명확히
                 "type": "order_confirmed",
+                "product": row.product,
                 "order_no": order_no,
                 "summary": {
                     "product": row.product,
                     "slots": {k: v.get("value") for k, v in (row.slots or {}).items()},
                     "total": quote_result.total if quote_result else None,
                 },
-                "final_preview": final_preview,        # 최종 확정본 미리보기 (발주 인계)
+                "final_preview": front_preview,        # 최종 확정본 앞면 (발주 인계)
+                "back_preview": back_preview,          # 뒷면 (양면일 때)
                 "changes": changes,                    # 접수본 대비 변경 내역
                 "file_name": Path(row.file_path).name if row.file_path else None,
             }
@@ -1359,14 +1402,21 @@ class IntakeService:
             )
         if d.quote is not None and not d.quote.missing:
             cards.append({"type": "quote", "estimate": d.estimate, **d.quote.model_dump(mode="json")})
-        # 최종 확인 체크리스트 (맥도날드 키오스크식) — 확정 직전에 사양을 한 번 훑고 진행
+        # 최종 확인 체크리스트 (맥도날드 키오스크식) — 확정 직전에 사양·도안을 한 번 훑고 진행
         if d.confirm_review:
+            # 명함이면 도안 예시를 3D로 함께 보여준다 (앞/뒷면)
+            front_preview = back_preview = None
+            if row.product == "namecard" and row.file_path:
+                front_preview, back_preview = self._card_previews(row, row.id)
             cards.append(
                 {
                     "type": "confirm_review",
+                    "product": row.product,
                     "specs": d.confirm_review,
                     "total": d.quote.total if (d.quote and not d.quote.missing) else None,
                     "estimate": d.estimate,
+                    "preview": front_preview,
+                    "back_preview": back_preview,
                 }
             )
         # 변경 내역 카드는 보정 직후·최종 확정 때만 (매 턴 반복 노출 방지)

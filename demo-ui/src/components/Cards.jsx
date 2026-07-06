@@ -316,12 +316,19 @@ function EscalationCard({ card }) {
 function ConfirmReviewCard({ card, latest, busy, onReopen, onConfirm }) {
   const specs = card.specs || []
   const disabled = busy || !latest
+  const show3D = card.product === 'namecard' && Boolean(card.preview_url)
   return (
     <div className="card confirm-review">
       <div className="card-title">
         주문 확인
         <span className="card-title-sub">확정 전에 한 번만 봐주세요</span>
       </div>
+      {show3D && (
+        <div className="review-3d">
+          <CardViewer3D previewUrl={card.preview_url} backUrl={card.back_url} label="주문 도안 3D 미리보기" />
+          <p className="design-hint">드래그해서 앞뒤로 돌려보세요</p>
+        </div>
+      )}
       <ul className="review-list">
         {specs.map((s) => (
           <li key={s.slot} className="review-row">
@@ -378,8 +385,8 @@ function OrderConfirmedCard({ card }) {
         <div className="order-final">
           {show3D ? (
             <>
-              <CardViewer3D previewUrl={card.final_url} label="최종 확정본 3D 미리보기" />
-              <p className="design-hint">드래그해서 돌려보세요</p>
+              <CardViewer3D previewUrl={card.final_url} backUrl={card.back_url} label="최종 확정본 3D 미리보기" />
+              <p className="design-hint">드래그해서 앞뒤로 돌려보세요</p>
             </>
           ) : (
             finalUrl && (

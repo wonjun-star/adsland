@@ -8,11 +8,12 @@ import { fileUrl } from '../api'
 
 const CARD_W = 1.8 // 가로 (9)
 const CARD_H = 1.0 // 세로 (5) → 90×50mm = 9:5
+const FACE_ASPECT = CARD_W / CARD_H // 카드 면 기본 비율 (이미지 비율에 맞춰 가로 스케일 보정)
 const CARD_D = 0.024 // 두께 (얇은 카드)
 const CORNER = 0.06 // 모서리 둥글기
 const PAPER = 0xf3f1ec // 시안 로딩 전 앞면 종이색
-const EDGE = 0xe9e6df // 뒷면·측면(카드 뒷면/두께) 종이색
-const MAX_TILT = THREE.MathUtils.degToRad(38) // 드래그 회전 각도 제한(뒤집힘 방지)
+const EDGE = 0xe9e6df // 측면(카드 두께)·뒷면 종이색
+const MAX_TILT_X = THREE.MathUtils.degToRad(34) // 위아래 기울기만 제한(좌우는 뒷면까지 자유 회전)
 
 /** WebGL 사용 가능 여부(폴백 판단용). */
 function webglAvailable() {
@@ -54,7 +55,7 @@ function remapUV(geo, w, h) {
   uv.needsUpdate = true
 }
 
-export default function CardViewer3D({ previewUrl, label }) {
+export default function CardViewer3D({ previewUrl, backUrl, label }) {
   const mountRef = useRef(null)
   const apiRef = useRef(null) // { setTexture } — 씬 구성 후 텍스처 교체용 핸들
   const [failed, setFailed] = useState(false)
@@ -137,9 +138,18 @@ export default function CardViewer3D({ previewUrl, label }) {
     const front = new THREE.Mesh(frontGeo, frontMat)
     front.position.z = frontZ + 0.002
 
+    // 뒷면 판 — 카드 뒤쪽에 얹고 Y로 180° 돌려, 카드를 뒤집으면 바로 읽힌다(실물 카드처럼).
+    const backGeo = new THREE.ShapeGeometry(shape, 18)
+    remapUV(backGeo, CARD_W, CARD_H)
+    const backMat = new THREE.MeshStandardMaterial({ color: EDGE, roughness: 0.76, metalness: 0.0 })
+    const back = new THREE.Mesh(backGeo, backMat)
+    back.position.z = -(frontZ + 0.002)
+    back.rotation.y = Math.PI
+
     const card = new THREE.Group()
     card.add(body)
     card.add(front)
+    card.add(back)
     scene.add(card)
 
     // 바닥 소프트 섀도(실물이 놓인 느낌) — 배경 그라디언트는 CSS 가 담당(alpha 캔버스).
@@ -154,18 +164,21 @@ export default function CardViewer3D({ previewUrl, label }) {
     // 텍스처 로더 — anisotropy 최대, sRGB 색공간.
     const maxAniso = renderer.capabilities.getMaxAnisotropy()
     const loader = new THREE.TextureLoader()
-    let currentTexture = null
+    const textures = { front: null, back: null }
 
-    function setTexture(url) {
+    // 앞/뒷면 텍스처를 각 판에 얹는다. 앞면 이미지 비율에 맞춰 카드 가로를 조정해
+    // (억지로 늘리지 않고) 원본 비율 그대로 보이게 한다.
+    function applyTexture(face, url) {
+      const mat = face === 'back' ? backMat : frontMat
+      const paper = face === 'back' ? EDGE : PAPER
       const src = fileUrl(url)
-      // 기존 텍스처 dispose 후 종이색으로 리셋
-      if (currentTexture) {
-        currentTexture.dispose()
-        currentTexture = null
+      if (textures[face]) {
+        textures[face].dispose()
+        textures[face] = null
       }
-      frontMat.map = null
-      frontMat.color.set(PAPER)
-      frontMat.needsUpdate = true
+      mat.map = null
+      mat.color.set(paper)
+      mat.needsUpdate = true
       if (!src) return
       loader.load(
         src,
@@ -177,15 +190,21 @@ export default function CardViewer3D({ previewUrl, label }) {
           tex.colorSpace = THREE.SRGBColorSpace
           tex.anisotropy = maxAniso
           tex.needsUpdate = true
-          if (currentTexture) currentTexture.dispose()
-          currentTexture = tex
-          frontMat.map = tex
-          frontMat.color.set(0xffffff)
-          frontMat.needsUpdate = true
+          if (textures[face]) textures[face].dispose()
+          textures[face] = tex
+          mat.map = tex
+          mat.color.set(0xffffff)
+          mat.needsUpdate = true
+          // 이미지 비율대로 카드 폭 보정 — 세로/가로 어떤 파일이 와도 안 찌그러지게
+          const im = tex.image
+          if (face === 'front' && im && im.width && im.height) {
+            const imgAspect = im.width / im.height
+            card.scale.x = Math.max(0.4, Math.min(2.4, imgAspect / FACE_ASPECT))
+          }
         },
         undefined,
         () => {
-          // 로드 실패: 종이색 앞면 유지(크래시 없이 넘어감)
+          // 로드 실패: 종이색 유지(크래시 없이 넘어감)
         },
       )
     }
@@ -200,7 +219,7 @@ export default function CardViewer3D({ previewUrl, label }) {
     let cRY = 0 // 현재 회전 Y
     let idle = Math.random() * Math.PI * 2
 
-    const clamp = (v) => Math.max(-MAX_TILT, Math.min(MAX_TILT, v))
+    const clampX = (v) => Math.max(-MAX_TILT_X, Math.min(MAX_TILT_X, v))
     const onDown = (e) => {
       dragging = true
       lastX = e.clientX
@@ -213,8 +232,8 @@ export default function CardViewer3D({ previewUrl, label }) {
       const dy = e.clientY - lastY
       lastX = e.clientX
       lastY = e.clientY
-      tRY = clamp(tRY + dx * 0.008)
-      tRX = clamp(tRX + dy * 0.008)
+      tRY += dx * 0.01 // 좌우는 제한 없이 — 끝까지 돌리면 뒷면이 보인다
+      tRX = clampX(tRX + dy * 0.008)
     }
     const onUp = () => {
       dragging = false
@@ -252,7 +271,10 @@ export default function CardViewer3D({ previewUrl, label }) {
     }
     animate()
 
-    apiRef.current = { setTexture }
+    apiRef.current = {
+      setFront: (u) => applyTexture('front', u),
+      setBack: (u) => applyTexture('back', u),
+    }
 
     return () => {
       disposed = true
@@ -261,12 +283,15 @@ export default function CardViewer3D({ previewUrl, label }) {
       renderer.domElement.removeEventListener('pointerdown', onDown)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      if (currentTexture) currentTexture.dispose()
+      if (textures.front) textures.front.dispose()
+      if (textures.back) textures.back.dispose()
       bodyGeo.dispose()
       frontGeo.dispose()
+      backGeo.dispose()
       groundGeo.dispose()
       bodyMat.dispose()
       frontMat.dispose()
+      backMat.dispose()
       groundMat.dispose()
       renderer.dispose()
       if (renderer.domElement.parentNode) {
@@ -276,10 +301,13 @@ export default function CardViewer3D({ previewUrl, label }) {
     }
   }, [])
 
-  // preview_url 이 바뀌면(템플릿 전환) 기존 텍스처 dispose 후 새로 로드.
+  // preview_url / back_url 이 바뀌면(템플릿 전환·양면) 기존 텍스처 dispose 후 새로 로드.
   useEffect(() => {
-    apiRef.current?.setTexture(previewUrl)
+    apiRef.current?.setFront(previewUrl)
   }, [previewUrl])
+  useEffect(() => {
+    apiRef.current?.setBack(backUrl)
+  }, [backUrl])
 
   if (failed) {
     const src = fileUrl(previewUrl)

@@ -153,8 +153,15 @@ def _publish_cards(cards: list[dict]) -> list[dict]:
             )
             continue
         if card.get("type") == "order_confirmed":
-            published = {k: v for k, v in card.items() if k != "final_preview"}
+            published = {k: v for k, v in card.items() if k not in ("final_preview", "back_preview")}
             published["final_url"] = _to_file_url(card.get("final_preview"))
+            published["back_url"] = _to_file_url(card.get("back_preview"))
+            out.append(published)
+            continue
+        if card.get("type") == "confirm_review":
+            published = {k: v for k, v in card.items() if k not in ("preview", "back_preview")}
+            published["preview_url"] = _to_file_url(card.get("preview"))
+            published["back_url"] = _to_file_url(card.get("back_preview"))
             out.append(published)
             continue
         out.append(card)
