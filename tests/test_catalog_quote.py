@@ -78,13 +78,15 @@ def test_coating_has_default_low_risk():
         assert coating.risk_if_defaulted == Risk.LOW, pid
 
 
-def test_cut_type_high_risk_inferred_from_dieline():
+def test_cut_type_inferred_from_dieline_defaults_square():
+    """재단 형태는 칼선(dieline) 있으면 도무송으로 추론, 없으면 사각 기본 — 묻지 않는다."""
     catalog = load_catalog()
     for pid in ("sticker", "label"):
         cut = catalog[pid].slots["cut_type"]
         assert cut.required, pid
         assert "dieline_present" in cut.infer_from, pid
-        assert cut.risk_if_defaulted == Risk.HIGH, pid
+        assert cut.has_default and cut.default == "square", pid
+        assert cut.risk_if_defaulted == Risk.LOW, pid  # 기본값 통보 후 진행 (질문 안 함)
 
 
 def test_quantity_has_quick_options():

@@ -328,6 +328,41 @@ def create_app() -> FastAPI:
             extra.append({"type": "file_preview", "url": url})
         return _turn_response(result, reply, extra_cards=extra)
 
+    @app.post("/api/session/{session_id}/uploads")
+    async def post_uploads(session_id: str, files: list[UploadFile]):
+        """여러 파일을 한 번에 접수 (예: 명함 앞면·뒷면). 순서대로 병합 처리하고
+        결과는 한 번만 보여준다 — 하나 보고 기다렸다 또 하나 보는 일이 없게."""
+        run_or_404(pipeline.service.view_session, session_id)
+        if not files:
+            raise HTTPException(status_code=400, detail="파일이 없습니다.")
+
+        dest_dir = UPLOAD_DIR / session_id
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        saved: list[tuple[Path, str]] = []
+        for file in files:
+            content = await file.read()
+            if len(content) > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="파일이 너무 큽니다 (최대 30MB).")
+            if not content.startswith(PDF_MAGIC):
+                raise HTTPException(status_code=400, detail="PDF 파일만 업로드할 수 있습니다.")
+            safe = _safe_filename(file.filename)
+            seq = len(list(dest_dir.glob("up_*")))
+            dest = dest_dir / f"up_{seq:02d}_{safe}"
+            dest.write_bytes(content)
+            saved.append((dest, safe))
+
+        # 앞면 → (있으면) 뒷면 순으로 반영, 마지막 검판 결과만 반환
+        result = reply = None
+        for dest, safe in saved:
+            result, reply = run_or_404(pipeline.process_upload, session_id, dest, safe)
+
+        extra: list[dict] = []
+        for dest, _safe in saved:
+            url = _to_file_url(_render_first_page_preview(dest, session_id))
+            if url:
+                extra.append({"type": "file_preview", "url": url})
+        return _turn_response(result, reply, extra_cards=extra)
+
     @app.post("/api/session/{session_id}/autofix")
     def post_autofix(session_id: str, body: AutofixBody):
         result, reply = run_or_404(pipeline.process_autofix, session_id, body.check_id)

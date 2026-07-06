@@ -61,7 +61,8 @@ slots:
     display_name: 재단 형태
     required: true
     infer_from: [dieline_present]     # 칼선 별색(CutContour 등) 있으면 도무송(자유형) 추정
-    risk_if_defaulted: high           # 틀리면 실물 파손 → 반드시 고객 확정
+    default: square                   # 칼선 없으면 사각 재단이 기본 — 묻지 않고 진행
+    risk_if_defaulted: low            # 파일에 칼선 있으면 도무송으로 자동 인식, 없으면 사각 통보
     choices: [square, circle, die_cut]
     synonyms:
       "도무송": die_cut
