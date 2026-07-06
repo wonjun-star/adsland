@@ -10,6 +10,9 @@ export const PRODUCT_LABELS = {
   flyer: '전단',
   poster: '포스터',
   label: '라벨',
+  postcard: '엽서',
+  memopad: '떡메모지',
+  photocard: '포토카드',
 }
 
 export const SLOT_LABELS = {
@@ -38,6 +41,10 @@ const VALUE_LABELS = {
   art_paper: '아트지 라벨',
   yupo: '유포지(방수)',
   clear_pet: '투명 PET',
+  rendezvous_240: '랑데뷰 240g',
+  woodfree_100: '모조지 100g',
+  woodfree_80: '모조지 80g',
+  pearl_300: '펄지 300g',
   // 코팅
   none: '없음',
   matte: '무광',
@@ -202,6 +209,14 @@ export function measuredSummary(result) {
       if (m.min_dpi === null) return '배치된 이미지 없음'
       if (m.min_dpi !== undefined) return `유효 해상도 최저 ${fmtNum(m.min_dpi)}dpi`
       break
+    case 'colorspace': {
+      const n = Array.isArray(m.rgb_objects) ? m.rgb_objects.length : (m.rgb_draw_total ?? 0)
+      return n > 0 ? `화면용 RGB 색상 ${n}곳` : '인쇄용 CMYK로 준비됨'
+    }
+    case 'trim_safety': {
+      const n = m.violation_count ?? (Array.isArray(m.violations) ? m.violations.length : 0)
+      return n > 0 ? `재단 안전선 안쪽 침범 ${n}곳` : '안전 여백 확보'
+    }
     case 'font_embed':
       if (m.unembedded_used_font_count === 0) return '사용 폰트 전부 임베딩됨'
       if (Array.isArray(m.unembedded_used_fonts) && m.unembedded_used_fonts.length > 0) {
@@ -254,29 +269,8 @@ export function measuredSummary(result) {
     default:
       break
   }
-  return genericMeasured(m)
-}
-
-function genericMeasured(measured) {
-  const parts = []
-  for (const [key, value] of Object.entries(measured)) {
-    if (parts.length >= 3) break
-    if (Array.isArray(value)) {
-      if (value.length > 0 && typeof value[0] === 'object') parts.push(`${key} ${value.length}건`)
-      else if (value.length > 0) parts.push(`${key} ${listPreview(value)}`)
-    } else if (typeof value === 'boolean') {
-      parts.push(`${key} ${value ? '있음' : '없음'}`)
-    } else if (value !== null && typeof value === 'object') {
-      const inner = Object.entries(value)
-        .slice(0, 4)
-        .map(([k, v]) => `${k} ${typeof v === 'number' ? fmtNum(v) : String(v)}`)
-        .join(', ')
-      parts.push(`${key}: ${inner}`)
-    } else if (value !== null && value !== undefined && value !== '') {
-      parts.push(`${key} ${typeof value === 'number' ? fmtNum(value) : String(value)}`)
-    }
-  }
-  return parts.join(' · ')
+  // 전용 요약이 없으면 내부 계측 필드명을 노출하지 않는다 (설명은 message가 담당).
+  return ''
 }
 
 // ---------------------------------------------------------------- 견적/에스컬레이션
