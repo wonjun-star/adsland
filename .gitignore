@@ -11,3 +11,5 @@ data/previews/
 .env
 data/samples/
 build/
+anthropic_key.txt
+.env

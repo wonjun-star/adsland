@@ -137,7 +137,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.19
+      "elapsed_sec": 0.09
     },
     {
       "file": "data/samples/corpus/clean_02_sticker_v2.pdf",
@@ -177,7 +177,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/clean_04_namecard_v2.pdf",
@@ -197,7 +197,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/clean_05_flyer_v1.pdf",
@@ -257,7 +257,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.01
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/clean_08_poster_v2.pdf",
@@ -277,7 +277,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/clean_09_label_v1.pdf",
@@ -317,7 +317,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/single_01_namecard_bleed.pdf",
@@ -405,7 +405,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.01
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/single_05_flyer_resolution.pdf",
@@ -471,7 +471,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.01
     },
     {
       "file": "data/samples/corpus/single_08_flyer_font_embed.pdf",
@@ -493,7 +493,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/single_09_label_font_embed.pdf",
@@ -515,7 +515,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/single_10_namecard_trim_safety.pdf",
@@ -537,7 +537,7 @@
         "transparency": "pass",
         "trim_safety": "uncertain"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/single_11_sticker_trim_safety.pdf",
@@ -625,7 +625,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.01
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/single_15_flyer_black_type.pdf",
@@ -890,7 +890,7 @@
         "transparency": "pass",
         "trim_safety": "uncertain"
       },
-      "elapsed_sec": 0.01
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/multi_02_namecard_page_size-page_count.pdf",
@@ -913,7 +913,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/multi_03_flyer_resolution-colorspace.pdf",
@@ -982,7 +982,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/multi_06_namecard_font_embed-trim_safety.pdf",
@@ -1005,7 +1005,7 @@
         "transparency": "pass",
         "trim_safety": "uncertain"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/multi_07_flyer_transparency-min_line.pdf",
@@ -1074,7 +1074,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.01
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/multi_10_label_colorspace-font_embed.pdf",
@@ -1097,7 +1097,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.02
     },
     {
       "file": "data/samples/corpus/multi_11_namecard_black_type-min_line-trim_safety.pdf",
@@ -1168,7 +1168,7 @@
         "transparency": "pass",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.02
+      "elapsed_sec": 0.0
     },
     {
       "file": "data/samples/corpus/multi_14_sticker_resolution-transparency-min_line.pdf",
@@ -1192,7 +1192,7 @@
         "transparency": "warn",
         "trim_safety": "pass"
       },
-      "elapsed_sec": 0.0
+      "elapsed_sec": 0.01
     },
     {
       "file": "data/samples/corpus/multi_15_label_page_count-black_type.pdf",

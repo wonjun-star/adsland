@@ -308,6 +308,10 @@ class IntakeService:
                     self.store.transition(session_id, State.SLOT_FILLING, "product_from_file")
                 row = self._get(session_id)
 
+        # 파일의 실제 크기를 주문 규격으로 삼는다 (검판 전에 반영 → 규격 불일치 헛질문 방지)
+        size_from_file = self._apply_file_size(session_id)
+        row = self._get(session_id)
+
         # 정식 검판 전이는 SLOT_FILLING/PROOF_CONFIRM에서만 가능 (상품 미정이면 비공식 검판)
         formal = State(row.state) in (State.SLOT_FILLING, State.PROOF_CONFIRM)
         if formal:
@@ -321,10 +325,47 @@ class IntakeService:
         notices = [] if row.product else ["file_received_need_product"]
         if merged_back:
             notices.insert(0, "back_side_merged")
+        if size_from_file:
+            notices.insert(0, f"size_from_file:{size_from_file}")
         result = self._advance(session_id, notices=notices, kind="upload", report=report)
         if detected:
             result.directives.detected_product = self.catalog[detected].display_name
         return result
+
+    def _apply_file_size(self, session_id: str) -> str | None:
+        """업로드한 파일의 실제 재단 크기를 '주문 규격'으로 삼는다.
+
+        파일이 곧 인쇄할 크기다 — 미리 고른 값과 파일이 다르면 파일이 이긴다
+        (그래야 '파일이 주문과 달라요, 어느 쪽?' 같은 헛질문이 안 생긴다).
+        표준 규격에 맞으면 그 규격으로, 아니면 파일 실측값(예: 53x94)을 그대로 쓴다.
+        반환: 이전 값(사용자·기본값)을 파일 기준으로 바꿨으면 새 크기 문자열, 아니면 None.
+        """
+        from core.preflight.engine import CheckContext
+
+        row = self._get(session_id)
+        if not row.product or not row.file_path:
+            return None
+        schema = self.catalog[row.product]
+        if "size" not in schema.slots:
+            return None
+        try:
+            ctx = CheckContext(row.file_path)
+            size = ctx.trim_size_mm(0)
+            ctx.close()
+        except Exception:
+            return None
+        if not size:
+            return None
+        w, h = size
+        match = match_size_choice(schema, w, h)
+        value = match or f"{round(w)}x{round(h)}"
+        entry = (row.slots or {}).get("size", {})
+        prev = entry.get("value")
+        if prev == value:
+            return None
+        self.store.set_slot(session_id, "size", value, source="file")
+        # 이전에 사람이 고른 값이 있었는데 파일이 다르면 알려준다 (조용히 바꾸지 않음)
+        return value if prev is not None and entry.get("source") in ("user", "default") else None
 
     def _infer_product_from_file(self, file_path: Path) -> str | None:
         """파일을 보고 '무엇을 만들려는지' 추정한다 (정확 매칭이 아니라 넉넉한 의도 추정).

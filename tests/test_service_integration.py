@@ -87,7 +87,8 @@ def test_size_inferred_from_file_suppresses_question(svc):
     asked = {q.slot for q in r.directives.questions}
     assert "size" not in asked
     assert r.session.slots.get("size", {}).get("value") == "90x90"
-    assert r.session.slots["size"]["source"] == "inferred"
+    # 업로드 시 파일 실제 크기가 규격의 기준(source=file) — 파일이 곧 인쇄 크기
+    assert r.session.slots["size"]["source"] == "file"
     # 칼선 별색 존재 → cut_type 추론 → risk high지만 질문 억제
     assert "cut_type" not in asked
 
