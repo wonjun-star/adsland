@@ -232,7 +232,7 @@ def _safe_filename(original: str | None) -> str:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="print-intake", docs_url=None, redoc_url=None)
+    app = FastAPI(title="adsland", docs_url=None, redoc_url=None)
     pipeline = ChatPipeline(IntakeService())
 
     # -------------------------------------------------------- 미들웨어

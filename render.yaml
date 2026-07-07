@@ -3,7 +3,7 @@
 # UptimeRobot 등으로 /api/health 를 5분 간격 핑하면 사실상 상시 가동.
 services:
   - type: web
-    name: print-intake
+    name: adsland
     runtime: docker
     plan: free
     healthCheckPath: /api/health

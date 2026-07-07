@@ -1,4 +1,4 @@
-# print-intake — AI 인쇄 접수 시스템 프로토타입
+# adsland — AI 인쇄 접수·검판 시스템 (애즈랜드 프로토타입)
 
 파일 접수 → 검판(프리플라이트) → 견적 → 확정을 대화형 AI로 자동화하는 완동 프로토타입.
 설계 원칙과 마일스톤은 [docs/PLAN.md](docs/PLAN.md), 아키텍처 결정은 [docs/decisions/](docs/decisions/),

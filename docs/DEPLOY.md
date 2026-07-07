@@ -1,6 +1,6 @@
 # 배포 가이드 — 무료로 URL 하나 만들어 애즈랜드에 전달하기
 
-목표 상태: `https://print-intake.onrender.com` 같은 주소 + 접속 코드를 애즈랜드 담당자에게
+목표 상태: `https://adsland.onrender.com` 같은 주소 + 접속 코드를 애즈랜드 담당자에게
 보내면, 담당자가 브라우저에서 바로 파일을 올려 검판·견적·확정까지 체험할 수 있다.
 
 ## 1안 (기본): Render 무료 플랜
@@ -19,7 +19,7 @@
 1. **GitHub에 올리기**
    ```powershell
    cd print-intake
-   git remote add origin https://github.com/<계정>/print-intake.git
+   git remote add origin https://github.com/<계정>/adsland.git
    git push -u origin master
    ```
 
