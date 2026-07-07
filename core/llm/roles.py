@@ -1091,6 +1091,12 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
             f"파일이 {filesz.replace('x', '×')}mm인데, 표준 {std.replace('x', '×')}mm에 "
             "재단여백을 더한 크기예요. 문제 없어서 그대로 진행할게요."
         )
+    if code == "cutline_accepted":
+        return "칼선 파일 확인했어요 — 도무송 재단으로 진행할게요."
+    if code.startswith("cutline_invalid:"):
+        return "칼선 파일을 확인해 주세요: " + code.split(":", 1)[1]
+    if code == "cutline_invalid":
+        return "칼선 파일을 확인하지 못했어요. K100 선으로 그린 칼선 파일을 올려주세요."
     return None  # quote_missing 등 내부 코드는 질문/에스컬레이션이 따로 안내한다
 
 

@@ -40,6 +40,7 @@ export default function App() {
         text: data.reply?.text || '',
         quickOptions: data.reply?.quick_options || [],
         questions: data.reply?.questions || [],
+        requestCutline: Boolean(data.reply?.request_cutline),
         cards: data.cards || [],
       })
     },
@@ -127,6 +128,18 @@ export default function App() {
       const formData = new FormData()
       for (const f of files) formData.append('files', f)
       await runTurn(() => api(`/api/session/${session.id}/uploads`, { method: 'POST', formData }))
+    },
+    [session, busy, push, runTurn],
+  )
+
+  // 도무송 칼선 파일 별도 접수 (POST /cutline)
+  const uploadCutline = useCallback(
+    (file) => {
+      if (!session || busy || !file) return
+      push({ role: 'user', text: `칼선 파일: ${file.name || 'cutline'}`, isFile: true })
+      const formData = new FormData()
+      formData.append('file', file)
+      runTurn(() => api(`/api/session/${session.id}/cutline`, { method: 'POST', formData }))
     },
     [session, busy, push, runTurn],
   )
@@ -275,6 +288,7 @@ export default function App() {
             onAutofix={applyAutofix}
             onDesign={applyDesign}
             onReopen={reopenSlot}
+            onCutline={uploadCutline}
             onConfirm={confirmOrder}
           />
           <SidePanel session={session} />

@@ -127,6 +127,7 @@ class ReplyDirectives(BaseModel):
     notices: list[str] = Field(default_factory=list)   # 기계 코드 목록 (예: invalid_value:size=75)
     request_product: bool = False
     request_file: bool = False
+    request_cutline: bool = False  # 도무송인데 칼선 없음 → 칼선 파일 별도 요청
     offer_autofix: list[str] = Field(default_factory=list)  # 체크 id
     report: PreflightReport | None = None
     quote: QuoteResult | None = None
@@ -1051,7 +1052,55 @@ class IntakeService:
             safety_mm=safety_mm_for(row.product, cut_type),
             max_ink_percent=gr.max_ink_percent,
             min_line_pt=gr.min_line_pt,
+            has_cutline=self._has_cutline(row.id),
         )
+
+    def _has_cutline(self, session_id: str) -> bool:
+        """도무송 칼선 파일을 별도로 받아 검증 통과했는가 (이벤트 기록으로 판단)."""
+        try:
+            return any(e.type == "cutline_accepted" for e in self.store.events(session_id))
+        except Exception:
+            return False
+
+    def handle_cutline(self, session_id: str, src_path: str | Path, original_name: str = "") -> TurnResult:
+        """도무송 칼선 파일 접수 → 검증 → 통과 시 칼선 제공됨 기록 후 재검판."""
+        from core.preflight.cutline import validate_cutline
+
+        row = self._get(session_id)
+        src = Path(src_path)
+        # 이미지 칼선도 PDF로 감싼다
+        try:
+            head = src.read_bytes()[:16]
+        except Exception:
+            head = b""
+        from core.intake.image_to_pdf import is_image_bytes
+
+        if is_image_bytes(head):
+            from core.intake.image_to_pdf import image_to_pdf
+
+            pdf_path = src.with_name(src.stem + "_cutimg.pdf")
+            try:
+                image_to_pdf(src, pdf_path)
+                src = pdf_path
+            except Exception:
+                pass
+
+        v = validate_cutline(src)
+        self.store.record_event(session_id, "cutline_uploaded", {"path": str(src), **v})
+        if not v["ok"]:
+            # 검증 실패 — 사유를 notice로 안내 (재업로드 유도)
+            notices = [f"cutline_invalid:{r}" for r in v["reasons"]] or ["cutline_invalid"]
+            return self._advance(session_id, notices=notices, kind="upload")
+
+        self.store.record_event(session_id, "cutline_accepted", {"path": str(src), "size_mm": v["size_mm"]})
+        # 재검판 (dieline이 has_cutline으로 통과되게)
+        if State(row.state) in (State.SLOT_FILLING, State.PROOF_CONFIRM):
+            self.store.transition(session_id, State.FILE_CHECK, "cutline_recheck")
+            report = self._run_preflight(session_id)
+            self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
+        else:
+            report = self._run_preflight(session_id)
+        return self._advance(session_id, notices=["cutline_accepted"], kind="upload", report=report)
 
     def _run_preflight(self, session_id: str) -> PreflightReport:
         row = self._get(session_id)
@@ -1331,6 +1380,18 @@ class IntakeService:
                     near = self._nearest_size_choice(schema, size_val)
                     if near:
                         d.notices.append(f"custom_size_estimate:{size_val}:{near}")
+
+        # 도무송인데 칼선이 없으면 칼선 파일을 따로 요청한다 (애즈랜드 4파일 분리 접수 방식)
+        if report is not None:
+            dl = report.by_id("dieline")
+            cut_val = (row.slots or {}).get("cut_type", {}).get("value")
+            if (
+                dl is not None
+                and str(dl.status) == "fail"
+                and cut_val == "die_cut"
+                and not self._has_cutline(session_id)
+            ):
+                d.request_cutline = True
 
         # 옵션별 실제 가격을 미리 계산해 둔다 — 고객이 "각각 얼마?"처럼 물으면
         # LLM이 이 값을 그대로 써서 답한다(지어내지 않게). 수량을 알아야 계산 가능.

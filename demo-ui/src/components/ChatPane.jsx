@@ -63,7 +63,31 @@ function QuickQuestions({ questions, onSelect, onSelectMany, onOther }) {
   )
 }
 
-function Message({ msg, latest, busy, onSelect, onSelectMany, onOther, onAutofix, onDesign, onReopen, onConfirm }) {
+// 도무송 칼선 파일 별도 업로드 버튼 (숨긴 file input을 여는 라벨)
+function CutlineButton({ onCutline }) {
+  const ref = useRef(null)
+  return (
+    <div className="cutline-upload">
+      <input
+        ref={ref}
+        type="file"
+        accept="application/pdf,.pdf,image/png,image/jpeg,.png,.jpg,.jpeg"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) onCutline(f)
+          e.target.value = ''
+        }}
+      />
+      <button type="button" className="btn primary" onClick={() => ref.current?.click()}>
+        칼선(K100) 파일 올리기
+      </button>
+      <span className="cutline-hint">도무송은 칼선을 K100 선으로 그린 파일이 따로 필요해요</span>
+    </div>
+  )
+}
+
+function Message({ msg, latest, busy, onSelect, onSelectMany, onOther, onAutofix, onDesign, onReopen, onCutline, onConfirm }) {
   if (msg.role === 'system') {
     return <div className="msg-system">{msg.text}</div>
   }
@@ -101,12 +125,13 @@ function Message({ msg, latest, busy, onSelect, onSelectMany, onOther, onAutofix
             onOther={onOther}
           />
         )}
+        {latest && !busy && msg.requestCutline && <CutlineButton onCutline={onCutline} />}
       </div>
     </div>
   )
 }
 
-export default function ChatPane({ messages, busy, session, onSend, onSelect, onSelectMany, onUpload, onAutofix, onDesign, onReopen, onConfirm }) {
+export default function ChatPane({ messages, busy, session, onSend, onSelect, onSelectMany, onUpload, onAutofix, onDesign, onReopen, onCutline, onConfirm }) {
   const [draft, setDraft] = useState('')
   const [dragging, setDragging] = useState(false)
   const endRef = useRef(null)
@@ -181,6 +206,7 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
             onAutofix={onAutofix}
             onDesign={onDesign}
             onReopen={onReopen}
+            onCutline={onCutline}
             onConfirm={onConfirm}
           />
         ))}

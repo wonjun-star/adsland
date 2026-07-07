@@ -56,6 +56,7 @@ class OrderContext:
         safety_mm: float | None = None,       # 품목별 안전여백
         max_ink_percent: float | None = None,  # 품목별 총잉크량 상한
         min_line_pt: float | None = None,     # 품목별 권장 최소 선굵기
+        has_cutline: bool = False,            # 도무송 칼선 파일을 별도로 받아 검증 통과했는가
     ):
         self.product = product
         self.size_mm = size_mm
@@ -65,6 +66,7 @@ class OrderContext:
         self.safety_mm = safety_mm
         self.max_ink_percent = max_ink_percent
         self.min_line_pt = min_line_pt
+        self.has_cutline = has_cutline
 
 
 class CheckContext:

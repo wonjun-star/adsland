@@ -138,6 +138,65 @@ def test_offcenter_trimbox_short_side_fails(tmp_path):
     assert r.status == CheckStatus.FAIL, f"왼쪽 1mm는 3mm 요구 미달 → fail 이어야: {r.detail}"
 
 
+def _cutline_pdf(path, mm_w, mm_h):
+    c = canvas.Canvas(str(path), pagesize=((mm_w + 10) * mm, (mm_h + 10) * mm))
+    c.setLineWidth(1)
+    c.rect(5 * mm, 5 * mm, mm_w * mm, mm_h * mm, fill=0, stroke=1)
+    c.showPage()
+    c.save()
+    return str(path)
+
+
+def test_validate_cutline_ok(tmp_path):
+    from core.preflight.cutline import validate_cutline
+
+    v = validate_cutline(_cutline_pdf(tmp_path / "cut.pdf", 40, 40))
+    assert v["ok"] is True
+    assert v["size_mm"] == (40.0, 40.0)
+
+
+def test_validate_cutline_too_small(tmp_path):
+    from core.preflight.cutline import validate_cutline
+
+    v = validate_cutline(_cutline_pdf(tmp_path / "small.pdf", 5, 5))
+    assert v["ok"] is False
+    assert any("10mm" in r for r in v["reasons"])
+
+
+def test_validate_cutline_no_strokes(tmp_path):
+    from core.preflight.cutline import validate_cutline
+
+    p = tmp_path / "nolines.pdf"
+    c = canvas.Canvas(str(p), pagesize=(50 * mm, 50 * mm))
+    c.setFillColorRGB(0, 0, 0)
+    c.rect(0, 0, 50 * mm, 50 * mm, fill=1, stroke=0)  # 칠만, 선 없음
+    c.showPage()
+    c.save()
+    from core.preflight.cutline import validate_cutline
+
+    v = validate_cutline(str(p))
+    assert v["ok"] is False
+
+
+def test_dieline_passes_with_cutline_flag():
+    """도무송인데 별색 칼선이 없어도, 칼선 파일이 별도 제공(has_cutline)되면 통과."""
+    from core.preflight.checks.dieline import check_dieline
+
+    class _Ctx:
+        page_count = 1
+        order = OrderContext(product="sticker", cut_type="die_cut", has_cutline=True)
+
+        def resources(self, i):
+            return None
+
+        def content_events(self, i):
+            return []
+
+    r = check_dieline(_Ctx())
+    assert r.status == CheckStatus.PASS
+    assert r.measured.get("cutline_file") is True
+
+
 @pytest.mark.parametrize("check_id", ["bleed", "colorspace", "resolution", "trim_safety"])
 def test_remediation_exists_for_key_checks(check_id):
     """주요 검수 항목엔 가이드 근거 수정 안내가 있어야 한다."""

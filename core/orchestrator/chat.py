@@ -183,6 +183,13 @@ class ChatPipeline:
         result = self.service.reopen_slot(session_id, slot)
         return result, self._render(result, self.adapter_provider())
 
+    def process_cutline(
+        self, session_id: str, saved_path: str | Path, original_name: str = ""
+    ) -> tuple[TurnResult, str]:
+        """도무송 칼선 파일 접수 → 검증 → 재검판."""
+        result = self.service.handle_cutline(session_id, saved_path, original_name)
+        return result, self._render(result, self.adapter_provider())
+
     # ------------------------------------------------------------ 내부
 
     def _propose(

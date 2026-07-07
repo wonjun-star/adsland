@@ -176,13 +176,23 @@ def check_dieline(ctx: CheckContext) -> CheckResult:
                     detail=f"칼선 없음 — {cut_type} 재단이라 칼선 불필요",
                 )
             if cut_type == "die_cut":
+                # 칼선 파일을 별도로 받아 검증 통과했으면(애즈랜드 4파일 분리 접수 방식) 통과.
+                if getattr(ctx.order, "has_cutline", False):
+                    measured["cutline_file"] = True
+                    return result(
+                        "dieline",
+                        CheckStatus.PASS,
+                        measured=measured,
+                        required=required,
+                        detail="도무송 — 칼선 파일이 별도로 제공되어 검증 통과",
+                    )
                 return result(
                     "dieline",
                     CheckStatus.FAIL,
                     measured=measured,
                     required=required,
                     pages=list(range(n_pages)),
-                    detail="도무송(자유형) 재단인데 칼선 별색이 없음 — 칼선을 넣어 다시 업로드 필요",
+                    detail="도무송(자유형) 재단인데 칼선이 없음 — 칼선(K100) 파일을 따로 올려주세요",
                 )
             # 재단 형태 미정 → 고객에게 물어볼 대상 (사람 검판 아님)
             return result(

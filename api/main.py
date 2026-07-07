@@ -187,7 +187,12 @@ def _turn_response(result: TurnResult, reply: str, extra_cards: list[dict] | Non
     cards = _publish_cards(result.cards) + list(extra_cards or [])
     return {
         "session": result.session.model_dump(mode="json"),
-        "reply": {"text": reply, "quick_options": quick_options, "questions": questions},
+        "reply": {
+            "text": reply,
+            "quick_options": quick_options,
+            "questions": questions,
+            "request_cutline": bool(result.directives.request_cutline),
+        },
         "cards": cards,
     }
 
@@ -375,6 +380,26 @@ def create_app() -> FastAPI:
             if url:
                 extra.append({"type": "file_preview", "url": url})
         return _turn_response(result, reply, extra_cards=extra)
+
+    @app.post("/api/session/{session_id}/cutline")
+    async def post_cutline(session_id: str, file: UploadFile):
+        """도무송 칼선 파일 접수 (K100 별색 칼선). PDF 또는 이미지."""
+        run_or_404(pipeline.service.view_session, session_id)
+        content = await file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="파일이 너무 큽니다 (최대 30MB).")
+        from core.intake.image_to_pdf import is_image_bytes
+
+        if not (content.startswith(PDF_MAGIC) or is_image_bytes(content)):
+            raise HTTPException(status_code=400, detail="칼선은 PDF 또는 이미지(JPG·PNG)로 올려주세요.")
+        dest_dir = UPLOAD_DIR / session_id
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        safe = _safe_filename(file.filename)
+        seq = len(list(dest_dir.glob("cut_*")))
+        dest = dest_dir / f"cut_{seq:02d}_{safe}"
+        dest.write_bytes(content)
+        result, reply = run_or_404(pipeline.process_cutline, session_id, dest, safe)
+        return _turn_response(result, reply)
 
     @app.post("/api/session/{session_id}/autofix")
     def post_autofix(session_id: str, body: AutofixBody):
