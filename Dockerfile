@@ -10,7 +10,12 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 
-# pikepdf(qpdf)·pdfium 휠은 manylinux 제공되므로 시스템 패키지 불필요
+# Ghostscript: EPS → 래스터 변환에 필요 (없으면 EPS는 'PDF로 저장' 안내로 폴백).
+# pikepdf(qpdf)·pdfium 휠은 manylinux 제공이라 그 외 시스템 패키지는 불필요.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ghostscript \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir \
     fastapi "uvicorn[standard]" pikepdf pypdfium2 reportlab Pillow numpy \
