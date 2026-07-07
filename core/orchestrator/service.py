@@ -1101,6 +1101,23 @@ class IntakeService:
         except Exception:
             return False
 
+    def show_3d(self, session_id: str) -> TurnResult:
+        """고객이 '3D로 보여줘'라고 하면 현재 파일을 3D 미리보기 카드로 띄운다 (상품 무관)."""
+        row = self._get(session_id)
+        if not row.file_path:
+            return self._advance(session_id, notices=["no_file_for_3d"], kind="turn")
+        result = self._advance(session_id, notices=["showed_3d"], kind="turn")
+        fp, bp = self._card_previews(row, row.id)
+        if fp:
+            result.cards.insert(0, {
+                "type": "preview_3d",
+                "product": row.product,
+                "preview": fp,
+                "back_preview": bp,
+                "caption": "드래그해서 앞뒤로 돌려보세요",
+            })
+        return result
+
     def flip_back_side(self, session_id: str) -> TurnResult:
         """양면 파일의 뒷면(2페이지)을 180° 돌린다 — 뒷면 위아래가 뒤집혀 보일 때."""
         import pikepdf

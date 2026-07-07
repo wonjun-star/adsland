@@ -38,6 +38,14 @@ def _wants_back_flip(text: str) -> bool:
     updown = "위아래" in low and any(k in low for k in ("뒤집", "바꿔", "돌려", "반대"))
     return (back and action) or updown
 
+
+def _wants_3d_view(text: str) -> bool:
+    """'3D로 보여줘/띄워줘', '입체로 보여줘' 같은 3D 미리보기 요청인지."""
+    low = (text or "").replace(" ", "").lower()
+    return any(k in low for k in ("3d", "3디", "삼디", "입체", "쓰리디")) and any(
+        k in low for k in ("보여", "띄워", "보고", "확인", "돌려", "볼래", "볼게", "봐")
+    )
+
 #: 규칙 템플릿마저 실패했을 때의 최후 안내 (원문 예외는 절대 노출하지 않는다)
 _LAST_RESORT_REPLY = "안내 문구를 만드는 중 문제가 생겼어요. 잠시 후 다시 말씀해 주시면 이어서 도와드릴게요."
 
@@ -76,6 +84,12 @@ class ChatPipeline:
         # 뒷면 뒤집기 요청 (양면 파일이 있을 때) — "뒷면 뒤집어줘/돌려줘" 등 명시 요청이면 바로 실행
         if view.file_path and _wants_back_flip(text):
             result = self.service.flip_back_side(session_id)
+            result.directives.customer_message = text
+            return result, self._render(result, adapter)
+
+        # "3D로 보여줘" — 현재 파일을 3D 미리보기로 (거짓 '지원 안 함' 응답 대신 실제로 보여준다)
+        if _wants_3d_view(text):
+            result = self.service.show_3d(session_id)
             result.directives.customer_message = text
             return result, self._render(result, adapter)
 

@@ -1094,6 +1094,10 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
     if code == "eps_needs_ghostscript":
         return ("EPS 파일은 지금 서버 설정에서 바로 변환이 안 돼요. 번거로우시겠지만 "
                 "PDF로 저장해서 올려주시면 바로 검판해드릴게요.")
+    if code == "showed_3d":
+        return "3D로 띄웠어요 — 드래그해서 앞뒤로 돌려보며 확인해보세요."
+    if code == "no_file_for_3d":
+        return "3D로 보여드리려면 파일을 먼저 올려주세요. 올려주시면 바로 3D로 확인시켜드릴게요."
     if code == "back_flipped":
         return "뒷면을 180° 돌려서 방향을 맞췄어요. 미리보기(3D)에서 확인해보세요 — 더 조정할 게 있으면 말씀해주세요."
     if code == "flip_needs_double":
