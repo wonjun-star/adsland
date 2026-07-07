@@ -83,6 +83,21 @@ def _looks_exploring(text: str | None) -> bool:
     return any(m in low for m in _EXPLORE_MARKERS)
 
 
+#: 고객이 '이제 최종 견적/확인을 보겠다'는 신호 (이때만 견적·확인 카드를 띄운다)
+_FINAL_REVIEW_MARKERS = (
+    "최종견적", "견적볼", "견적보여", "견적확인", "최종확인", "확인할게", "확인해줘",
+    "이제됐", "다정했", "다됐어", "없어요", "없습니다", "없어", "없네", "그대로진행", "진행할게",
+)
+
+
+def _wants_final_review(text: str | None) -> bool:
+    """'최종 견적 볼게요 / 없어요(더 바꿀 것) / 그대로 진행' 처럼 최종 확인을 요청했는가."""
+    if not text:
+        return False
+    low = text.replace(" ", "")
+    return any(m in low for m in _FINAL_REVIEW_MARKERS)
+
+
 def _asked_options_slot(text: str, schema: ProductSchema | None) -> str | None:
     """'용지 뭐 있어?'처럼 특정 슬롯의 선택지를 묻는 말이면 그 슬롯명을 돌려준다."""
     if not text or schema is None:
@@ -149,6 +164,11 @@ class ReplyDirectives(BaseModel):
     escalation_reasons: list[str] = Field(default_factory=list)
     order_no: str | None = None
     awaiting_confirm: bool = False
+    # 사양이 다 됐지만, 바로 계약서(견적·확인 카드)를 들이밀지 않는다.
+    # offer_final_review=True → "더 바꿀 내용 있으세요? 없으면 최종 견적 보여드릴게요" (버튼만).
+    # show_final=True → 이번 턴에 고객이 최종 견적을 요청함 → 견적·확인 카드를 띄운다.
+    offer_final_review: bool = False
+    show_final: bool = False
     # 최종 확인 체크리스트 (맥도날드 키오스크식) — 각 항목 확인 후 '이대로 주문'
     confirm_review: list[dict] = Field(default_factory=list)
     # 시안 생성 경로
@@ -1512,11 +1532,17 @@ class IntakeService:
             and quote_result is not None
             and not quote_result.missing
         )
+        # 고객이 이번 턴에 '최종 견적/확인'을 요청했는가 (그때만 카드를 띄운다)
+        wants_final = _wants_final_review(customer_text)
         if state == State.SLOT_FILLING:
             if ready:
                 row = self.store.transition(session_id, State.PROOF_CONFIRM, "all_slots_and_checks_ok")
                 d.awaiting_confirm = True
-                d.confirm_review = self._confirm_specs(row, schema)
+                if wants_final:
+                    d.show_final = True
+                    d.confirm_review = self._confirm_specs(row, schema)
+                else:
+                    d.offer_final_review = True  # 계약서 안 들이밀고 먼저 물어본다
             elif needs_back:
                 d.request_file = True  # 양면인데 앞면만 → 뒷면 파일 요청
             elif not row.file_path:
@@ -1528,7 +1554,11 @@ class IntakeService:
         elif state == State.PROOF_CONFIRM:
             if ready:
                 d.awaiting_confirm = True
-                d.confirm_review = self._confirm_specs(row, schema)
+                if wants_final:
+                    d.show_final = True
+                    d.confirm_review = self._confirm_specs(row, schema)
+                else:
+                    d.offer_final_review = True  # 매 턴 견적·확인 카드를 다시 띄우지 않는다
             else:
                 # 확정 단계에서 조건이 깨졌으면 슬롯 수집으로 복귀
                 row = self.store.transition(session_id, State.SLOT_FILLING, "proof_conditions_broken")
@@ -1599,13 +1629,13 @@ class IntakeService:
                     "advisories": advisories,
                 }
             )
-        # 고객이 아직 옵션·가격을 탐색 중인 턴이면 견적·주문확인 카드를 다시 띄우지 않는다.
-        # (고객이 고르기를 끝낸 것 같을 때 다음 턴에 다시 보여준다 — 산만함 방지)
-        exploring = bool(d.asked_slot) or _looks_exploring(d.customer_message)
-        if d.quote is not None and not d.quote.missing and not exploring:
+        # 견적 카드: 슬롯 채우는 중엔 예상가를 보여줘 결정을 돕되(도움), 사양이 다 된
+        # 확정 단계(awaiting_confirm)에서는 고객이 '최종 견적 볼게요'라고 할 때만 띄운다
+        # — 매 턴 계약서처럼 들이밀지 않게.
+        if d.quote is not None and not d.quote.missing and (not d.awaiting_confirm or d.show_final):
             cards.append({"type": "quote", "estimate": d.estimate, **d.quote.model_dump(mode="json")})
-        # 최종 확인 체크리스트 (맥도날드 키오스크식) — 확정 직전에 사양·도안을 한 번 훑고 진행
-        if d.confirm_review and not exploring:
+        # 최종 확인 체크리스트 — 고객이 최종 견적을 요청한 턴에만 (confirm_review는 그때만 채워짐)
+        if d.confirm_review:
             # 명함이면 도안 예시를 3D로 함께 보여준다 (앞/뒷면)
             front_preview = back_preview = None
             if row.product == "namecard" and row.file_path:

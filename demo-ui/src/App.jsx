@@ -41,6 +41,7 @@ export default function App() {
         quickOptions: data.reply?.quick_options || [],
         questions: data.reply?.questions || [],
         requestCutline: Boolean(data.reply?.request_cutline),
+        offerFinalReview: Boolean(data.reply?.offer_final_review),
         cards: data.cards || [],
       })
     },

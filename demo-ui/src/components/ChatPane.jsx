@@ -87,7 +87,7 @@ function CutlineButton({ onCutline }) {
   )
 }
 
-function Message({ msg, latest, busy, onSelect, onSelectMany, onOther, onAutofix, onDesign, onReopen, onCutline, onConfirm }) {
+function Message({ msg, latest, busy, onSend, onSelect, onSelectMany, onOther, onAutofix, onDesign, onReopen, onCutline, onConfirm }) {
   if (msg.role === 'system') {
     return <div className="msg-system">{msg.text}</div>
   }
@@ -126,6 +126,14 @@ function Message({ msg, latest, busy, onSelect, onSelectMany, onOther, onAutofix
           />
         )}
         {latest && !busy && msg.requestCutline && <CutlineButton onCutline={onCutline} />}
+        {latest && !busy && msg.offerFinalReview && (
+          <div className="final-review-cta">
+            <button type="button" className="btn primary" onClick={() => onSend('최종 견적 볼게요')}>
+              최종 견적·확인 보기
+            </button>
+            <span className="final-review-hint">더 바꿀 게 있으면 그냥 말씀해 주세요</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -200,6 +208,7 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
             msg={m}
             latest={m.id === lastAssistantId}
             busy={busy}
+            onSend={onSend}
             onSelect={onSelect}
             onSelectMany={onSelectMany}
             onOther={focusComposer}

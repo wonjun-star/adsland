@@ -908,6 +908,20 @@ textarea {
   color: var(--muted);
 }
 
+/* 최종 견적 보기 유도 (계약서 안 들이밀고 먼저 물어보기) */
+.final-review-cta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.final-review-hint {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
 /* 도무송 칼선 파일 별도 업로드 */
 .cutline-upload {
   display: flex;

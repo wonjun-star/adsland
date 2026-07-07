@@ -1348,8 +1348,10 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
     if d.changes and d.kind == "autofix":
         parts.append(_changes_line(d.changes))
 
-    # 예상/확정 견적 — 한 줄 (항상 가격 먼저), 제작 기간 함께
-    if d.quote is not None and not d.quote.missing:
+    # 예상/확정 견적 — 한 줄. 단, 확정 단계에서 최종 견적을 아직 요청 안 했으면 금액 반복 안 함
+    # (매 턴 가격 들이미는 느낌 방지 — 최종 견적 요청 시에만 카드+금액을 보여준다).
+    show_price = (not d.awaiting_confirm) or getattr(d, "show_final", False)
+    if d.quote is not None and not d.quote.missing and show_price:
         prefix = "예상 견적" if d.estimate else "견적"
         lt = f" · 제작 {d.quote.lead_time}일" if getattr(d.quote, "lead_time", "") else ""
         parts.append(f"{prefix} {_won(d.quote.total)}{lt} (부가세 포함).")
@@ -1375,13 +1377,12 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
     elif len(normal_qs) >= 2:
         parts.append(_merged_question_line(normal_qs, schema))
 
-    # 확정 단계 — 검토 → 최종본 → 진행. (단, 고객이 질문·비교를 요청한 턴엔 확정 재촉하지 않는다)
+    # 확정 단계 — 계약서 들이밀지 않는다. 먼저 "더 바꿀 내용?"을 묻고, 최종 견적 요청 시에만 카드.
     asked_something = bool(comparison) or bool(asked) or bool(getattr(d, "customer_question", ""))
-    if d.awaiting_confirm and not asked_something:
-        if d.changes:
-            parts.append("검토 결과를 반영한 최종본이에요. 이대로 진행할까요?")
-        else:
-            parts.append("검판 통과했어요. 이대로 진행할까요?")
+    if getattr(d, "show_final", False):
+        parts.append("최종 견적·확인 아래에 띄웠어요. 바꿀 게 있으면 '바꾸기', 괜찮으면 '이대로 주문'을 눌러주세요.")
+    elif getattr(d, "offer_final_review", False) and not asked_something:
+        parts.append("사양은 다 정해졌어요. 더 바꾸실 내용 있으세요? 없으시면 최종 견적·확인 보여드릴게요.")
     elif d.awaiting_confirm and asked_something:
         parts.append("정하시면 말씀해주세요 — 그 사양으로 바로 마무리할게요.")
 

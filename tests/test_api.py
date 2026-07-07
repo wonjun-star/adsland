@@ -84,7 +84,9 @@ def test_full_journey_over_http(client):
     assert data["session"]["state"] == "PROOF_CONFIRM"
     types = [c["type"] for c in data["cards"]]
     assert "preflight_report" in types
-    assert "quote" in types
+    # 견적·확인 카드는 고객이 '최종 견적'을 요청할 때만 — 사양 완료 직후엔 먼저 물어본다
+    assert "quote" not in types
+    assert data["reply"]["offer_final_review"] is True
     report = next(c for c in data["cards"] if c["type"] == "preflight_report")
     assert report["gate_ok"] is True
 

@@ -55,8 +55,9 @@ def test_full_journey_rule_fallback():
     assert r.session.state == State.PROOF_CONFIRM
     assert r.directives.awaiting_confirm
     assert r.directives.quote is not None and r.directives.quote.total > 0
-    assert "이대로 진행할까요?" in reply
-    assert "부가세 포함" in reply
+    # 계약서(견적)를 바로 들이밀지 않고 '더 바꿀 내용?'을 먼저 묻는다
+    assert r.directives.offer_final_review
+    assert "더 바꾸실" in reply or "최종 견적" in reply
 
     # 턴 3: 자연어 확정 → COMPLETED
     r, reply = pipe.process_message(sid, "네 이대로 진행해주세요")

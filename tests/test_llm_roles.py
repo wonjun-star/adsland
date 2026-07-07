@@ -276,7 +276,8 @@ def test_render_auto_filled_not_narrated():
     assert len(reply) < 40           # 다른 지시가 없으면 아주 짧다
 
 
-def test_render_awaiting_confirm_is_terse():
+def test_render_offer_final_review_asks_first():
+    """사양 완료 시 계약서(견적 카드)를 들이밀지 않고 '더 바꿀 내용?'을 먼저 묻는다."""
     view = _view(
         state="PROOF_CONFIRM",
         slots={
@@ -285,20 +286,17 @@ def test_render_awaiting_confirm_is_terse():
             "material": {"value": "art_250", "source": "default"},
         },
     )
-    d = ReplyDirectives(kind="turn", awaiting_confirm=True)
+    d = ReplyDirectives(kind="turn", awaiting_confirm=True, offer_final_review=True)
     reply = render_reply(d, view, STICKER, adapter=None)
-    assert "이대로 진행할까요?" in reply       # 사양 요약은 카드·사이드패널이 담당
+    assert "더 바꾸실" in reply or "최종 견적" in reply
+    assert "이대로 진행할까요?" not in reply  # 계약서 재촉 안 함
 
 
-def test_render_awaiting_confirm_with_changes():
-    """변경이 있었으면 '검토 결과 반영한 최종본' 프레이밍."""
-    d = ReplyDirectives(
-        kind="turn",
-        awaiting_confirm=True,
-        changes=[{"label": "재단 여백 자동 연장", "before": "0mm", "after": "3mm"}],
-    )
+def test_render_show_final_points_to_card():
+    """고객이 최종 견적을 요청하면 카드로 안내한다 (바꾸기/이대로 주문)."""
+    d = ReplyDirectives(kind="turn", awaiting_confirm=True, show_final=True)
     reply = render_reply(d, _view(state="PROOF_CONFIRM"), STICKER, adapter=None)
-    assert "최종본" in reply and "진행할까요?" in reply
+    assert "이대로 주문" in reply or "바꾸기" in reply
 
 
 def test_render_estimate_quote_prefix():

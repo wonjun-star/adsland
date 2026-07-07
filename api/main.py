@@ -192,6 +192,7 @@ def _turn_response(result: TurnResult, reply: str, extra_cards: list[dict] | Non
             "quick_options": quick_options,
             "questions": questions,
             "request_cutline": bool(result.directives.request_cutline),
+            "offer_final_review": bool(result.directives.offer_final_review),
         },
         "cards": cards,
     }
