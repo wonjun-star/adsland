@@ -1629,6 +1629,17 @@ class IntakeService:
                     "advisories": advisories,
                 }
             )
+        # 파일을 눈에 보이게 바꿨으면(뒷면 뒤집기 등) 결과를 바로 3D로 보여준다 — 말로만 "확인해보세요" X
+        if "back_flipped" in d.notices and row.product == "namecard" and row.file_path:
+            fp, bp = self._card_previews(row, row.id)
+            if fp:
+                cards.append({
+                    "type": "preview_3d",
+                    "product": row.product,
+                    "preview": fp,
+                    "back_preview": bp,
+                    "caption": "뒷면을 뒤집었어요 — 드래그해서 앞뒤 방향 확인해보세요",
+                })
         # 견적 카드: 슬롯 채우는 중엔 예상가를 보여줘 결정을 돕되(도움), 사양이 다 된
         # 확정 단계(awaiting_confirm)에서는 고객이 '최종 견적 볼게요'라고 할 때만 띄운다
         # — 매 턴 계약서처럼 들이밀지 않게.

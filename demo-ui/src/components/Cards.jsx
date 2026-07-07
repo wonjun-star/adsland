@@ -409,6 +409,18 @@ function ConfirmReviewCard({ card, latest, busy, onReopen, onConfirm }) {
   )
 }
 
+// 파일을 눈에 보이게 바꾼 직후(뒷면 뒤집기 등) 결과를 3D로 바로 보여준다.
+function Preview3DCard({ card }) {
+  if (!card.preview_url) return null
+  return (
+    <div className="card">
+      <div className="card-title">바뀐 도안 확인</div>
+      <CardViewer3D previewUrl={card.preview_url} backUrl={card.back_url} label="바뀐 도안 3D 미리보기" />
+      <p className="design-hint">{card.caption || '드래그해서 앞뒤로 돌려보세요'}</p>
+    </div>
+  )
+}
+
 function OrderConfirmedCard({ card }) {
   const summary = card.summary || {}
   const slots = summary.slots || {}
@@ -580,6 +592,8 @@ function Card({ card, latest, busy, onAutofix, onDesign, onReopen, onConfirm }) 
       return <DesignPreviewCard card={card} latest={latest} busy={busy} onDesign={onDesign} />
     case 'confirm_review':
       return <ConfirmReviewCard card={card} latest={latest} busy={busy} onReopen={onReopen} onConfirm={onConfirm} />
+    case 'preview_3d':
+      return <Preview3DCard card={card} />
     case 'escalation':
       return <EscalationCard card={card} />
     case 'order_confirmed':

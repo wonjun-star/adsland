@@ -158,7 +158,7 @@ def _publish_cards(cards: list[dict]) -> list[dict]:
             published["back_url"] = _to_file_url(card.get("back_preview"))
             out.append(published)
             continue
-        if card.get("type") == "confirm_review":
+        if card.get("type") in ("confirm_review", "preview_3d"):
             published = {k: v for k, v in card.items() if k not in ("preview", "back_preview")}
             published["preview_url"] = _to_file_url(card.get("preview"))
             published["back_url"] = _to_file_url(card.get("back_preview"))
