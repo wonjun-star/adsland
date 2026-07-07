@@ -130,11 +130,15 @@ def test_parse_dieline_jargon():
     assert p.slots["cut_type"] == "die_cut"
 
 
-def test_intent_confirm_only_when_awaiting():
+def test_intent_confirm_strong_anytime_bare_only_when_awaiting():
+    # 강한 확정 표현(이대로 진행)은 상태와 무관하게 확정 — 안 고른 사양은 추천값으로 채워 완료
     p = parse_slots("네 이대로 진행해주세요", STICKER, adapter=None, awaiting_confirm=True)
     assert p.intent == Intent.CONFIRM
     p2 = parse_slots("네 이대로 진행해주세요", STICKER, adapter=None, awaiting_confirm=False)
-    assert p2.intent != Intent.CONFIRM
+    assert p2.intent == Intent.CONFIRM
+    # 맨손 '네'는 확정 단계일 때만 확정으로 (평소엔 아님)
+    assert parse_slots("네", STICKER, adapter=None, awaiting_confirm=True).intent == Intent.CONFIRM
+    assert parse_slots("네", STICKER, adapter=None, awaiting_confirm=False).intent != Intent.CONFIRM
 
 
 def test_intent_change_beats_confirm():

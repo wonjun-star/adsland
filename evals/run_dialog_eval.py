@@ -49,8 +49,10 @@ SCENARIO_DIR = Path(__file__).parent / "scenarios"
 REPORT_PATH = Path(__file__).parent / "reports" / "dialog_eval.json"
 
 #: 목표치 (PLAN §5 M4 DoD, §9)
+#: A유형 평균 질문: 사양(사이즈·용지·코팅·재단·수량)을 버튼으로 다 물어보는 설계라
+#: 예전 '최소 질문(≤3)'보다 높다 — 대신 '추천대로' 한 번에 넘어갈 수 있어 마찰은 낮다.
 TARGET_PASS_COUNT = 13
-TARGET_A_AVG_QUESTIONS = 3.0
+TARGET_A_AVG_QUESTIONS = 6.0
 
 #: id 접두사 → 유형 라벨 (a1_* / b3_* / e5_* 규약)
 _TYPE_RE = re.compile(r"^([abe])\d+_", re.IGNORECASE)

@@ -313,8 +313,10 @@ def _rule_intent(text: str, awaiting_confirm: bool) -> tuple[Intent, bool]:
         return Intent.DENY, negative
     if _CHANGE_RE.search(text):
         return Intent.CHANGE, negative
-    if awaiting_confirm and "?" not in text and (
-        _CONFIRM_RE.search(text) or tokens & _CONFIRM_TOKENS
+    # 강한 확정 표현(이대로·진행·확정·주문할게)은 상태와 무관하게 확정 의사로 본다
+    # — 안 고른 사양은 추천값으로 채워 완료된다. 맨손 '네/응'은 확정 단계일 때만.
+    if "?" not in text and (
+        _CONFIRM_RE.search(text) or (awaiting_confirm and (tokens & _CONFIRM_TOKENS))
     ):
         return Intent.CONFIRM, negative
     if negative:
@@ -1094,6 +1096,8 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
     if code == "eps_needs_ghostscript":
         return ("EPS 파일은 지금 서버 설정에서 바로 변환이 안 돼요. 번거로우시겠지만 "
                 "PDF로 저장해서 올려주시면 바로 검판해드릴게요.")
+    if code == "applied_recommended":
+        return "안 고르신 사양은 추천값으로 채웠어요. 바꾸실 항목이 있으면 눌러서 바꿔주세요."
     if code == "showed_3d":
         return "3D로 띄웠어요 — 드래그해서 앞뒤로 돌려보며 확인해보세요."
     if code == "no_file_for_3d":

@@ -6,9 +6,10 @@ import TurnCards from './Cards'
 
 // 물어볼 게 하나면 누르는 즉시 접수. 여러 개면 각각 고른 뒤 "이대로 접수"로 한 번에 —
 // 하나 눌렀다고 나머지가 나 모르게 넘어가지 않게 한다.
-function QuickQuestions({ questions, onSelect, onSelectMany, onOther }) {
+function QuickQuestions({ questions, onSend, onSelect, onSelectMany, onOther }) {
   const [picks, setPicks] = useState({})
   const multi = questions.length > 1
+  const hasRecommended = questions.some((q) => q.recommended)
 
   const choose = (slot, value, label) => {
     if (!multi) {
@@ -33,14 +34,16 @@ function QuickQuestions({ questions, onSelect, onSelectMany, onOther }) {
           <div className="quick-options">
             {(q.options || []).map((opt, i) => {
               const selected = picks[q.slot]?.value === opt
+              const recommended = q.recommended && String(opt) === String(q.recommended)
               return (
                 <button
                   key={i}
                   type="button"
-                  className={selected ? 'chip selected' : 'chip'}
+                  className={`chip${selected ? ' selected' : ''}${recommended ? ' recommended' : ''}`}
                   onClick={() => choose(q.slot, opt, slotValueLabel(q.slot, opt))}
                 >
                   {slotValueLabel(q.slot, opt)}
+                  {recommended && <span className="chip-badge">추천</span>}
                 </button>
               )
             })}
@@ -52,13 +55,20 @@ function QuickQuestions({ questions, onSelect, onSelectMany, onOther }) {
           </div>
         </div>
       ))}
-      {multi && (
-        <button type="button" className="picks-submit" disabled={pickedCount === 0} onClick={submit}>
-          {pickedCount === questions.length
-            ? '이대로 접수 →'
-            : `고른 것만 접수 (${pickedCount}/${questions.length}) →`}
-        </button>
-      )}
+      <div className="quick-actions">
+        {multi && (
+          <button type="button" className="picks-submit" disabled={pickedCount === 0} onClick={submit}>
+            {pickedCount === questions.length
+              ? '이대로 접수 →'
+              : `고른 것만 접수 (${pickedCount}/${questions.length}) →`}
+          </button>
+        )}
+        {multi && hasRecommended && (
+          <button type="button" className="chip recommend-all" onClick={() => onSend('추천대로 해줘')}>
+            추천대로 다 채우기
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -120,6 +130,7 @@ function Message({ msg, latest, busy, onSend, onSelect, onSelectMany, onOther, o
         {latest && !busy && msg.questions?.length > 0 && (
           <QuickQuestions
             questions={msg.questions}
+            onSend={onSend}
             onSelect={onSelect}
             onSelectMany={onSelectMany}
             onOther={onOther}

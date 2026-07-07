@@ -46,6 +46,12 @@ def _wants_3d_view(text: str) -> bool:
         k in low for k in ("보여", "띄워", "보고", "확인", "돌려", "볼래", "볼게", "봐")
     )
 
+
+def _wants_recommended(text: str) -> bool:
+    """'추천대로 / 알아서 / 기본으로 / 그냥 해줘' — 안 고른 사양을 추천값으로 채워달라는 뜻."""
+    low = (text or "").replace(" ", "")
+    return any(k in low for k in ("추천대로", "추천으로", "알아서", "기본으로", "기본값으로", "그냥해", "다추천", "추천값"))
+
 #: 규칙 템플릿마저 실패했을 때의 최후 안내 (원문 예외는 절대 노출하지 않는다)
 _LAST_RESORT_REPLY = "안내 문구를 만드는 중 문제가 생겼어요. 잠시 후 다시 말씀해 주시면 이어서 도와드릴게요."
 
@@ -90,6 +96,12 @@ class ChatPipeline:
         # "3D로 보여줘" — 현재 파일을 3D 미리보기로 (거짓 '지원 안 함' 응답 대신 실제로 보여준다)
         if _wants_3d_view(text):
             result = self.service.show_3d(session_id)
+            result.directives.customer_message = text
+            return result, self._render(result, adapter)
+
+        # "추천대로 해줘 / 알아서 / 기본으로" — 안 고른 사양을 추천값으로 일괄 채운다
+        if view.product and _wants_recommended(text):
+            result = self.service.apply_recommended(session_id)
             result.directives.customer_message = text
             return result, self._render(result, adapter)
 

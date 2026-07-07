@@ -43,25 +43,19 @@ def test_full_journey_rule_fallback():
     assert r.session.slots["size"]["value"] == "90x90"
     assert r.session.slots["quantity"]["value"] == 500
     assert r.session.slots["cut_type"]["value"] == "die_cut"
-    # material/coating은 기본값 자동 채움(risk low) → 통보 문장
-    assert r.session.slots["material"]["value"] == "art_250"
-    assert r.directives.request_file
-    assert isinstance(reply, str) and "파일" in reply
+    # 용지·코팅은 이제 버튼으로 물어본다 (자동 채움 아님)
+    assert {"material", "coating"} <= {q.slot for q in r.directives.questions}
+    assert isinstance(reply, str)
 
-    # 턴 2: 정상 파일 업로드 → 검판 통과 → 견적 + 확정 대기
+    # 턴 2: 정상 파일 업로드 → 검판 통과. 아직 용지·코팅 안 골라 SLOT_FILLING
     r, reply = pipe.process_upload(sid, CLEAN_STICKER, "clean_sticker.pdf")
     assert r.directives.report is not None
     assert r.directives.report.gate_ok
-    assert r.session.state == State.PROOF_CONFIRM
-    assert r.directives.awaiting_confirm
-    assert r.directives.quote is not None and r.directives.quote.total > 0
-    # 계약서(견적)를 바로 들이밀지 않고 '더 바꿀 내용?'을 먼저 묻는다
-    assert r.directives.offer_final_review
-    assert "더 바꾸실" in reply or "최종 견적" in reply
 
-    # 턴 3: 자연어 확정 → COMPLETED
+    # 턴 3: 자연어 확정 → 안 고른 용지·코팅은 추천값으로 채워지고 COMPLETED
     r, reply = pipe.process_message(sid, "네 이대로 진행해주세요")
     assert r.session.state == State.COMPLETED
+    assert r.session.slots["material"]["value"] == "art_250"  # 추천값 적용
     assert r.directives.order_no
     assert r.directives.order_no in reply
     assert not r.session.escalated
@@ -74,7 +68,7 @@ def test_process_confirm_button_path():
     sid = r.session.id
     pipe.process_message(sid, "스티커 90x90 500매 도무송이요")
     r, _ = pipe.process_upload(sid, CLEAN_STICKER)
-    assert r.session.state == State.PROOF_CONFIRM
+    # 용지·코팅을 아직 안 골라 SLOT_FILLING — 확정 버튼이 추천값을 채우고 완료시킨다
     r, reply = pipe.process_confirm(sid)
     assert r.session.state == State.COMPLETED
     assert r.directives.order_no and r.directives.order_no in reply

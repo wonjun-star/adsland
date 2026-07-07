@@ -97,13 +97,19 @@ def test_optional_coating_with_default_auto_filled():
     assert "coating" not in [q.slot for q in d.questions]
 
 
-def test_cut_type_high_risk_asked_despite_default():
-    """cut_type은 risk high라 default 있어도 질문."""
-    d = next_actions(sticker_schema(), slots={}, inferred={}, report=None)
+def test_specs_are_offered_as_choices_not_autofilled():
+    """선택지가 있는 사양(용지·코팅·재단 등)은 기본값이 있어도 버튼으로 물어본다(추천 표시)."""
+    from core.products.schema import load_catalog
+
+    schema = load_catalog()["sticker"]
+    d = next_actions(schema, slots={}, inferred={}, report=None)
     q = {q.slot: q for q in d.questions}
-    assert "cut_type" in q
-    assert q["cut_type"].reason == "required_default_high_risk"
-    assert "cut_type" not in [a.slot for a in d.auto_filled]
+    # 기본값 있는 사양(용지·코팅·재단)도 질문으로 나오고 auto_filled에는 없다
+    for name in ("material", "coating", "cut_type"):
+        assert name in q, name
+        assert name not in [a.slot for a in d.auto_filled], name
+    # 기본값은 recommended로 표시 (예: 재단 square)
+    assert q["cut_type"].recommended == "square"
 
 
 def test_cut_type_inferred_from_dieline_not_asked():

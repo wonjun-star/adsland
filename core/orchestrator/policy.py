@@ -62,6 +62,7 @@ class SlotQuestion(BaseModel):
     quick_options: list[Any] = Field(default_factory=list)
     options: list[Any] = Field(default_factory=list)   # 선택 버튼용 값 목록 (quick_options ∨ choices)
     allow_other: bool = True                            # '기타' 직접 입력 허용
+    recommended: str = ""                              # 추천(기본)값 — UI가 '추천'으로 강조
 
 
 class AutoFill(BaseModel):
@@ -150,23 +151,18 @@ def next_actions(
         if has_value or has_inferred:
             continue
 
-        # 3) 값 없음 ∧ 추론 실패 — 기본값으로 해소 가능한가?
-        if sdef.has_default and sdef.risk_if_defaulted != Risk.HIGH:
-            if sdef.risk_if_defaulted == Risk.LOW:
-                note = f"기본값 '{sdef.default}' 적용 (위험도 low — 통보 후 진행)"
-            else:  # medium
-                note = f"기본값 '{sdef.default}' 제안 (위험도 medium — 가벼운 확인 권장)"
-            decision.auto_filled.append(AutoFill(slot=name, value=sdef.default, note=note))
-            continue
-
-        # 4) 남은 경우: 기본값 없음 ∨ 위험 높음 → required일 때만 질문
-        if sdef.required:
+        # 3) 값 없음 ∧ 추론 실패.
+        # 고객이 직접 고르게 — 선택지가 있는 사양(사이즈·용지·코팅·재단·수량 등)은 기본값이 있어도
+        # **버튼으로 물어본다.** 기본값은 '추천'으로 표시하되 최종 선택은 고객 몫.
+        # (조용히 기본값으로 채우지 않는다 — 사용자 요구: 초기에 다 물어보고 정하게)
+        opts = list(sdef.quick_options) or list(sdef.choices)
+        if opts and (sdef.required or sdef.has_default):
             if not sdef.has_default:
                 reason = "required_no_default"
+            elif sdef.risk_if_defaulted == Risk.HIGH:
+                reason = "required_default_high_risk"
             else:
-                reason = "required_default_high_risk"  # 틀리면 실물 파손 → 반드시 확정
-            # 선택 버튼용 옵션: quick_options 우선, 없으면 choices. 항상 '기타' 직접 입력 허용.
-            opts = list(sdef.quick_options) or list(sdef.choices)
+                reason = "offer_choice"  # 기본값 있지만 고객이 고르게 (추천 표시)
             decision.questions.append(
                 SlotQuestion(
                     slot=name,
@@ -175,9 +171,20 @@ def next_actions(
                     quick_options=list(sdef.quick_options),
                     options=opts,
                     allow_other=True,
+                    recommended=str(sdef.default) if sdef.has_default else "",
                 )
             )
-        # required 아니고 기본값도 없으면: 아무것도 하지 않는다 (선택 사양)
+            continue
+
+        # 4) 선택지가 없는 슬롯인데 기본값이 있으면 자동 채움 (고를 게 없으니 통보만)
+        if sdef.has_default and sdef.risk_if_defaulted != Risk.HIGH:
+            note = f"기본값 '{sdef.default}' 적용"
+            decision.auto_filled.append(AutoFill(slot=name, value=sdef.default, note=note))
+        # 선택지도 기본값도 없는 필수 슬롯은 (드묾) 자유 입력 질문
+        elif sdef.required:
+            decision.questions.append(
+                SlotQuestion(slot=name, display_name=display, reason="required_no_default", allow_other=True)
+            )
 
     return decision
 

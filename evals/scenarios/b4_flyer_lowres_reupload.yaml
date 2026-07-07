@@ -10,7 +10,7 @@ steps:
 expect:
   completed: true
   final_state: COMPLETED
-  max_questions: 2
+  max_questions: 8
   slots:
     size: A5
     quantity: 2000

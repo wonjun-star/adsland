@@ -45,29 +45,22 @@ def test_full_journey_type_a(svc):
     assert r.session.state == State.SLOT_FILLING
     assert r.session.slots["size"]["value"] == "90x90"
     assert r.session.slots["cut_type"]["value"] == "die_cut"  # synonyms 정규화
-    # material/coating은 기본값 자동 채움 (risk low)
-    assert r.session.slots["material"]["value"] == "art_250"
-    assert {q.slot for q in r.directives.questions} == set()
-    assert r.directives.request_file  # 파일 요청 단계
+    # 용지·코팅은 이제 버튼으로 물어본다 (조용히 자동 채우지 않음)
+    asked = {q.slot for q in r.directives.questions}
+    assert "material" in asked and "coating" in asked
 
     # 턴 2: 정상 파일 업로드
     assert CLEAN_STICKER.exists(), "make gen-samples 필요"
     r = svc.handle_upload(sid, CLEAN_STICKER)
     assert r.directives.report is not None
 
-    if r.directives.report.gate_ok:
-        # 검판 통과 → 견적 + 확정 대기
-        assert r.session.state == State.PROOF_CONFIRM
-        assert r.directives.quote is not None and r.directives.quote.total > 0
-        assert r.directives.awaiting_confirm
-
-        # 턴 3: 확정
-        r = svc.confirm(sid)
-        assert r.session.state == State.COMPLETED
+    # 턴 3: 확정 — 안 고른 용지·코팅은 추천값으로 채워지고 완료 (uncertain이면 미완도 정상)
+    r = svc.confirm(sid)
+    if r.session.state == State.COMPLETED:
         assert r.directives.order_no
+        assert r.session.slots["material"]["value"] == "art_250"  # 추천값 적용
         assert r.cards and r.cards[0]["type"] == "order_confirmed"
     else:
-        # 체크 레지스트리 상태에 따라 uncertain이 있으면 확정 단계로 못 간다 — 그 자체가 정상 동작
         assert r.session.state == State.SLOT_FILLING
 
 

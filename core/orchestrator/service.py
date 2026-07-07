@@ -277,10 +277,14 @@ class IntakeService:
             self._run_preflight(session_id)
             self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
 
-        # 확정 의사가 확정 단계에서 나오면 확정 처리로 위임
+        # 확정 의사가 나오면 확정으로 위임 — confirm()이 안 고른 사양을 추천값으로 채우고 재평가한다
+        # (필수값이 없으면 confirm이 미완 처리 → 되묻는다).
         row = self._get(session_id)
-        if wants_confirm and State(row.state) == State.PROOF_CONFIRM:
-            return self.confirm(session_id)
+        if wants_confirm:
+            result = self.confirm(session_id)
+            if result.session.state == State.COMPLETED.value:
+                return result
+            # 확정 실패(필수값 부족 등) → 일반 흐름으로 되묻는다
 
         return self._advance(
             session_id, notices=notices, negative_sentiment=negative, customer_text=customer_text
@@ -879,8 +883,15 @@ class IntakeService:
         return front, back
 
     def confirm(self, session_id: str) -> TurnResult:
-        """고객 확정 → 3중 관문 → 통과 시 결제 목업 → 주문 완료."""
+        """고객 확정 → 3중 관문 → 통과 시 결제 목업 → 주문 완료.
+
+        확정하려는데 아직 안 고른 사양이 있으면(용지·코팅 등 기본값 있는 것) 추천값으로 채우고
+        재평가한다 — '확정'은 안 고른 건 추천을 받아들이는 것. 그래도 필수값(사이즈·수량)이 없으면 미완.
+        """
         row = self._get(session_id)
+        if State(row.state) != State.PROOF_CONFIRM:
+            self.apply_recommended(session_id)
+            row = self._get(session_id)
         if State(row.state) != State.PROOF_CONFIRM:
             return self._advance(session_id, notices=["confirm_not_ready"])
 
@@ -1100,6 +1111,24 @@ class IntakeService:
             return any(e.type == "cutline_accepted" for e in self.store.events(session_id))
         except Exception:
             return False
+
+    def apply_recommended(self, session_id: str) -> TurnResult:
+        """'추천대로 해줘' — 아직 안 고른 사양을 각 기본(추천)값으로 채운다 (고객이 빨리 넘어가게)."""
+        row = self._get(session_id)
+        if row.product:
+            schema = self.catalog[row.product]
+            for name, sdef in schema.slots.items():
+                have = (row.slots or {}).get(name, {}).get("value") is not None
+                if not have and sdef.has_default:
+                    self.store.set_slot(session_id, name, sdef.default, source="default")
+            # 재단 형태 등이 채워졌으면 파일 재검판이 필요할 수 있음
+            row = self._get(session_id)
+            if row.file_path and State(row.state) == State.SLOT_FILLING:
+                self.store.transition(session_id, State.FILE_CHECK, "recommended_recheck")
+                report = self._run_preflight(session_id)
+                self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
+                return self._advance(session_id, notices=["applied_recommended"], report=report)
+        return self._advance(session_id, notices=["applied_recommended"])
 
     def show_3d(self, session_id: str) -> TurnResult:
         """고객이 '3D로 보여줘'라고 하면 현재 파일을 3D 미리보기 카드로 띄운다 (상품 무관)."""

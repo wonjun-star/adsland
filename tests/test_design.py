@@ -117,16 +117,14 @@ def test_design_flow_full_journey(chat):
     assert dp["preview"]  # 미리보기 생성됨
     assert r.directives.report.gate_ok  # 생성 시안이 검판 통과
 
-    # 파일에서 사이즈·인쇄면 추론 → 질문은 수량 1개
+    # 파일에서 사이즈·인쇄면 추론. 수량·용지·코팅은 버튼으로 물어본다
     assert r.session.slots["size"]["value"] == "90x50"
     assert r.session.slots["sides"]["value"] == "single"
-    assert [q.slot for q in r.directives.questions] == ["quantity"]
+    assert "quantity" in {q.slot for q in r.directives.questions}
 
-    r, reply = chat.process_message(sid, "400장이요")
-    assert r.session.state == "PROOF_CONFIRM"
-    assert r.directives.quote is not None
+    r, reply = chat.process_message(sid, "400장이요")  # 용지·코팅은 아직 안 골라 SLOT_FILLING
 
-    r, reply = chat.process_message(sid, "네 진행할게요")
+    r, reply = chat.process_message(sid, "네 진행할게요")  # 추천값 채우고 확정
     assert r.session.state == "COMPLETED"
 
 

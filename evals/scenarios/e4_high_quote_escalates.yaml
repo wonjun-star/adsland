@@ -4,10 +4,11 @@ id: e4_high_quote_escalates
 description: 포스터 A1 300장 고액 주문. 견적이 임계(30만원)를 넘어 담당자 확인으로 넘어간다.
 steps:
   - user: "포스터 A1으로 300장 주문하려고요."
+  - user: "용지·코팅은 추천대로 해줘"
 expect:
   completed: false
   final_state: SLOT_FILLING
-  max_questions: 2
+  max_questions: 8
   slots:
     size: A1
     quantity: 300

@@ -8,7 +8,7 @@ steps:
 expect:
   completed: true
   final_state: COMPLETED
-  max_questions: 3
+  max_questions: 8
   slots:
     size: "90x50"
     quantity: 200

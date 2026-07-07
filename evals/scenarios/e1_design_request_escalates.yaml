@@ -7,6 +7,6 @@ steps:
 expect:
   completed: false
   final_state: SLOT_FILLING
-  max_questions: 3
+  max_questions: 8
   escalated: true
   escalation_contains: "customer_type_C"

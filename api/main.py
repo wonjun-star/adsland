@@ -180,6 +180,7 @@ def _turn_response(result: TurnResult, reply: str, extra_cards: list[dict] | Non
             "label": q.display_name or q.slot,
             "options": list(q.options or q.quick_options),
             "allow_other": q.allow_other,
+            "recommended": q.recommended,
         }
         for q in result.directives.questions
     ]
