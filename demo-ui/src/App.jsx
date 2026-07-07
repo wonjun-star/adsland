@@ -117,10 +117,10 @@ export default function App() {
           f.type === 'application/pdf' ||
           f.type === 'image/png' ||
           f.type === 'image/jpeg' ||
-          /\.(pdf|png|jpe?g)$/i.test(f.name || ''),
+          /\.(pdf|png|jpe?g|psd|eps)$/i.test(f.name || ''),
       )
       if (files.length === 0) {
-        push({ role: 'system', text: 'PDF 또는 이미지(JPG·PNG)만 접수할 수 있어요.' })
+        push({ role: 'system', text: 'PDF·이미지(JPG·PNG)·PSD·EPS만 접수할 수 있어요.' })
         return
       }
       const names = files.map((f) => f.name || 'upload.pdf')

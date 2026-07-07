@@ -225,7 +225,7 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
         <input
           ref={fileRef}
           type="file"
-          accept="application/pdf,.pdf,image/png,image/jpeg,.png,.jpg,.jpeg"
+          accept="application/pdf,.pdf,image/png,image/jpeg,.png,.jpg,.jpeg,.psd,.eps"
           multiple
           hidden
           onChange={(e) => {

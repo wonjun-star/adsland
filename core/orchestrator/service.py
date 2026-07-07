@@ -321,8 +321,9 @@ class IntakeService:
             head = b""
         from core.intake.image_to_pdf import is_image_bytes
 
+        eps_no_gs = False
         if is_image_bytes(head):
-            from core.intake.image_to_pdf import image_to_pdf
+            from core.intake.image_to_pdf import EpsNeedsGhostscript, image_to_pdf
 
             order_size = self._order_context(row).size_mm
             pdf_path = src_path.with_name(src_path.stem + "_img.pdf")
@@ -330,8 +331,12 @@ class IntakeService:
                 image_to_pdf(src_path, pdf_path, size_mm=order_size)
                 src_path = pdf_path
                 image_wrapped = True
+            except EpsNeedsGhostscript:
+                eps_no_gs = True  # 서버에 Ghostscript 없음 → 안내 (PDF로 저장 요청)
             except Exception:
                 pass  # 변환 실패 시 원본 그대로 진행 (아래 프리플라이트가 판단 불가로 격리)
+        if eps_no_gs:
+            return self._advance(session_id, notices=["eps_needs_ghostscript"], kind="upload")
 
         prev_file = row.file_path  # 뒷면 병합 판단용 (앞면)
 

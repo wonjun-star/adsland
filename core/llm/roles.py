@@ -1091,6 +1091,9 @@ def _notice_line(code: str, schema: ProductSchema | None) -> str | None:
             f"파일이 {filesz.replace('x', '×')}mm인데, 표준 {std.replace('x', '×')}mm에 "
             "재단여백을 더한 크기예요. 문제 없어서 그대로 진행할게요."
         )
+    if code == "eps_needs_ghostscript":
+        return ("EPS 파일은 지금 서버 설정에서 바로 변환이 안 돼요. 번거로우시겠지만 "
+                "PDF로 저장해서 올려주시면 바로 검판해드릴게요.")
     if code == "cutline_accepted":
         return "칼선 파일 확인했어요 — 도무송 재단으로 진행할게요."
     if code.startswith("cutline_invalid:"):

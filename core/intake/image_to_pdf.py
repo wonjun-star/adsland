@@ -17,18 +17,41 @@ import numpy as np
 import pikepdf
 from PIL import Image
 
-#: 이미지 매직바이트
+#: 접수 가능한 래스터/원본 매직바이트
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 JPEG_MAGIC = b"\xff\xd8\xff"
+PSD_MAGIC = b"8BPS"                  # 포토샵 PSD
+EPS_ASCII_MAGIC = b"%!PS"           # PostScript/EPS (ASCII)
+EPS_BINARY_MAGIC = b"\xc5\xd0\xd3\xc6"  # DOS EPS (바이너리 헤더)
 
 
 def is_image_bytes(data: bytes) -> str | None:
-    """바이트 앞부분으로 이미지 형식 판별 → 'png'|'jpeg'|None."""
+    """바이트 앞부분으로 형식 판별 → 'png'|'jpeg'|'psd'|'eps'|None.
+
+    PSD·EPS도 PDF로 감싸 검수한다(PSD는 합성 이미지, EPS는 Ghostscript로 래스터).
+    """
     if data.startswith(PNG_MAGIC):
         return "png"
     if data.startswith(JPEG_MAGIC):
         return "jpeg"
+    if data.startswith(PSD_MAGIC):
+        return "psd"
+    if data.startswith(EPS_ASCII_MAGIC) or data.startswith(EPS_BINARY_MAGIC):
+        return "eps"
     return None
+
+
+class EpsNeedsGhostscript(RuntimeError):
+    """EPS 변환에 Ghostscript가 필요한데 없을 때."""
+
+
+def _looks_eps(path: Path) -> bool:
+    """파일 앞부분으로 EPS/PostScript 여부 판별 (확장자에 의존하지 않음)."""
+    try:
+        head = Path(path).read_bytes()[:4]
+    except Exception:
+        return False
+    return head.startswith(EPS_ASCII_MAGIC) or head.startswith(EPS_BINARY_MAGIC)
 
 
 def image_to_pdf(
@@ -42,7 +65,13 @@ def image_to_pdf(
     """
     img_path, out_pdf = Path(img_path), Path(out_pdf)
     out_pdf.parent.mkdir(parents=True, exist_ok=True)
-    im = Image.open(img_path).convert("RGB")
+    # EPS는 Ghostscript로 래스터화된다 — 없으면 명확히 알린다 (PDF로 저장해 달라고 안내).
+    if _looks_eps(img_path):
+        from PIL import EpsImagePlugin
+
+        if not EpsImagePlugin.has_ghostscript():
+            raise EpsNeedsGhostscript("EPS 변환에는 Ghostscript가 필요해요")
+    im = Image.open(img_path).convert("RGB")  # PSD 합성/EPS 래스터/PNG·JPG 모두 RGB로
     w_px, h_px = im.size
 
     if size_mm and size_mm[0] and size_mm[1]:
