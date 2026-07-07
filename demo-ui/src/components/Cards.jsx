@@ -65,7 +65,7 @@ function BeforeAfter({
 function CheckRow({ result, latest, busy, onAutofix, passOnly }) {
   const meta = STATUS_META[result.status] || { className: 'unknown' }
   const measured = measuredSummary(result)
-  const canAutofix = latest && result.status === 'fail' && result.autofix?.available
+  const canAutofix = latest && (result.status === 'fail' || result.status === 'warn') && result.autofix?.available
   return (
     <li className={`check-row ${meta.className}`}>
       <div className="check-row-head">
@@ -83,8 +83,11 @@ function CheckRow({ result, latest, busy, onAutofix, passOnly }) {
       {canAutofix && (
         <div className="check-action">
           <button type="button" className="btn small accent" disabled={busy} onClick={() => onAutofix(result.check_id)}>
-            자동 보정 적용
+            {result.check_id === 'colorspace' ? 'CMYK로 자동 변환' : '자동 보정 적용'}
           </button>
+          {result.check_id === 'colorspace' && (
+            <span className="autofix-caveat">색이 약간 달라질 수 있어요</span>
+          )}
         </div>
       )}
       {!passOnly && result.fix_guide && <FixGuide guide={result.fix_guide} />}
@@ -145,6 +148,24 @@ function PreflightCard({ card, latest, busy, onAutofix }) {
         <ul className="check-list">
           {problems.map((r) => (
             <CheckRow key={r.check_id} result={r} latest={latest} busy={busy} onAutofix={onAutofix} />
+          ))}
+        </ul>
+      )}
+
+      {(card.advisories || []).length > 0 && (
+        <ul className="advisory-list">
+          {card.advisories.map((a) => (
+            <li key={a.key} className="advisory">
+              <span className="advisory-icon" aria-hidden="true">💡</span>
+              <span>
+                {a.text}
+                {a.guide_url && (
+                  <a className="advisory-link" href={a.guide_url} target="_blank" rel="noreferrer">
+                    {' '}가이드 →
+                  </a>
+                )}
+              </span>
+            </li>
           ))}
         </ul>
       )}

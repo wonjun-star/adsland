@@ -163,6 +163,9 @@ def check_font_embed(ctx: CheckContext) -> CheckResult:
             "used_font_count": len(used_fonts),
             "unembedded_used_font_count": len(bad_names),
             "unembedded_used_fonts": bad_names,
+            # 사용 폰트가 남아있으면 = 텍스트가 아웃라인(윤곽선)되지 않은 것.
+            # 애즈랜드는 아웃라인을 권장한다(상태는 안 바꾸고 안내만 — 임베드면 진행 가능).
+            "not_outlined": bool(used_fonts),
         }
         required = {"unembedded_used_font_count": 0}
 

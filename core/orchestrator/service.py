@@ -611,21 +611,34 @@ class IntakeService:
             self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
 
     def handle_autofix(self, session_id: str, check_id: str) -> TurnResult:
-        """autofix 적용 (현재 bleed 1종). 고친 파일로 교체 후 재검판."""
+        """autofix 적용 (도련 연장 / RGB→CMYK 변환). 고친 파일로 교체 후 재검판.
+
+        어떤 보정을 할지는 체크가 리포트에 담은 fix_id로 정한다 (extend_bleed / to_cmyk).
+        """
         row = self._get(session_id)
-        if check_id != "bleed":
-            return self._advance(session_id, notices=[f"autofix_unsupported:{check_id}"])
         if not row.file_path:
             return self._advance(session_id, notices=["autofix_no_file"])
+
+        # 최신 리포트에서 이 항목의 fix_id를 찾는다
+        report0 = self._latest_report(session_id)
+        cr = report0.by_id(check_id) if report0 else None
+        fix_id = cr.autofix.fix_id if (cr and cr.autofix.available) else None
+        if not fix_id:
+            return self._advance(session_id, notices=[f"autofix_unsupported:{check_id}"])
 
         src = Path(row.file_path)
         fixed = src.parent / f"{src.stem}_fixed.pdf"
         pv_dir = PREVIEW_DIR / session_id
-        # 품목별 요구 도련만큼 보정 (명함 1mm / 전단 2mm / 스티커 3mm)
-        from core.preflight.adsland_guide import DEFAULT_RULE, rule_for
+        if fix_id == "to_cmyk":
+            from core.autofix.to_cmyk import to_cmyk
 
-        bleed_mm = rule_for(row.product).bleed_mm or DEFAULT_RULE.bleed_mm
-        fix_result = extend_bleed(src, fixed, bleed_mm=bleed_mm, preview_dir=pv_dir)
+            fix_result = to_cmyk(src, fixed, preview_dir=pv_dir)
+        else:  # extend_bleed (기본)
+            # 품목별 요구 도련만큼 보정 (명함 1mm / 전단 2mm / 스티커 3mm)
+            from core.preflight.adsland_guide import DEFAULT_RULE, rule_for
+
+            bleed_mm = rule_for(row.product).bleed_mm or DEFAULT_RULE.bleed_mm
+            fix_result = extend_bleed(src, fixed, bleed_mm=bleed_mm, preview_dir=pv_dir)
         self.store.set_file_path(session_id, str(fixed))
         self.store.record_event(session_id, "autofix_applied", {"check_id": check_id, **fix_result})
 
@@ -1316,9 +1329,18 @@ class IntakeService:
         row = self._get(session_id)
         d.escalation_reasons = list(row.escalation_reasons or [])
 
-        # autofix 제안: 업로드/보정 직후, 또는 사양은 다 됐는데 자동보정 가능한 결함만 남아
-        # 막혔을 때만 (매 턴 "여백 보정 가능" 반복 방지).
+        # autofix 제안: 업로드/보정 직후엔 자동보정 가능한 fail·warn 모두(도련 연장·색상 변환 등),
+        # 그 외엔 '막고 있는' fail만 (매 턴 반복 방지).
         autofixable = (
+            [
+                r.check_id
+                for r in report.results
+                if r.status in (CheckStatus.FAIL, CheckStatus.WARN) and r.autofix.available
+            ]
+            if report is not None
+            else []
+        )
+        blocking_autofixable = (
             [r.check_id for r in report.results if r.status == CheckStatus.FAIL and r.autofix.available]
             if report is not None
             else []
@@ -1334,13 +1356,13 @@ class IntakeService:
         if kind in ("upload", "autofix"):
             d.offer_autofix = autofixable
         elif (
-            autofixable
+            blocking_autofixable
             and otherwise_ready
             and report is not None
             and not report.uncertains
             and not [r for r in report.failures if not r.autofix.available]
         ):
-            d.offer_autofix = autofixable
+            d.offer_autofix = blocking_autofixable
             d.notices.append("autofix_to_finish")
 
         # 상태 전진: 질문·충돌 없음 ∧ 파일 검판 clean → PROOF_CONFIRM
@@ -1417,11 +1439,22 @@ class IntakeService:
                             "guide_url": guide_url(rem.source),
                         }
                 results.append(rd)
+            # 통과했지만 가이드상 권장 사항(막지는 않음) — '참고' 안내로 별도 표시
+            advisories: list[dict] = []
+            fe = d.report.by_id("font_embed")
+            if fe is not None and str(fe.status) == "pass" and (fe.measured or {}).get("not_outlined"):
+                advisories.append({
+                    "key": "outline",
+                    "text": "글꼴이 아웃라인(윤곽선) 처리되지 않았어요. 임베드돼 있어 진행은 가능하지만, "
+                            "애즈랜드는 아웃라인을 권장해요.",
+                    "guide_url": guide_url("indesign"),
+                })
             cards.append(
                 {
                     "type": "preflight_report",
                     "results": results,
                     "gate_ok": d.report.gate_ok,
+                    "advisories": advisories,
                 }
             )
         if d.quote is not None and not d.quote.missing:

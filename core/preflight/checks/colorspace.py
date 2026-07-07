@@ -35,7 +35,11 @@ _ALLOWED_EXACT = {"DeviceCMYK", "DeviceGray", "ICC-CMYK", "ICC-Gray", "CalGray"}
 #: 인쇄되지 않는 텍스트 렌더 모드 (3=비표시, 7=클립 전용)
 _INVISIBLE_TEXT_MODES = {3, 7}
 
-_AUTOFIX = AutofixInfo(available=False, note="본개발: ICC 기반 자동 변환(색변화 고지) 예정")
+_AUTOFIX = AutofixInfo(
+    available=True,
+    fix_id="to_cmyk",
+    note="RGB→CMYK 근사 변환(GCR로 검정에 먹). ICC 프로파일 없이 하는 변환이라 색이 약간 달라질 수 있어 고지.",
+)
 
 
 def _unwrap_indexed(space: str) -> str:

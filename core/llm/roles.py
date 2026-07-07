@@ -1150,7 +1150,15 @@ def _report_summary_line(report: Any, offer_autofix: set[str]) -> str:
     n = len(problems)
     line = f"검판 완료 — {n}건 확인이 필요해요."
     if offer_autofix:
-        line += " 여백은 바로 자동 보정할 수 있어요."
+        fixes = []
+        if "bleed" in offer_autofix:
+            fixes.append("여백")
+        if "colorspace" in offer_autofix:
+            fixes.append("색상(CMYK 변환)")
+        if fixes:
+            line += f" {'·'.join(fixes)}은 제가 바로 바꿔드릴 수 있어요."
+        else:
+            line += " 일부는 제가 바로 보정할 수 있어요."
     return line
 
 

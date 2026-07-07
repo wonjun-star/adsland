@@ -202,7 +202,7 @@ def test_render_bleed_fail_summary_and_detail_in_translation():
     )
     reply = render_reply(d, _view(), STICKER, adapter=None)
     assert "검판 완료" in reply and "1건" in reply
-    assert "자동 보정" in reply
+    assert "여백" in reply and "바꿔드릴" in reply  # 자동 보정 제안
     detail = translate_check(_bleed_fail())  # 상세 숫자는 카드용 번역에 그대로
     assert "3mm" in detail and "0mm" in detail
 

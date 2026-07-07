@@ -55,8 +55,8 @@ def test_corpus_colorspace_defects_detected():
         assert r.measured["rgb_objects"], f.name
         assert r.pages == [0], f.name  # 코퍼스 결함은 전부 1페이지 파일
         assert r.required["allowed"] == ALLOWED
-        assert r.autofix.available is False
-        assert "ICC" in r.autofix.note  # 본개발 변환 예정 고지
+        assert r.autofix.available is True  # RGB→CMYK 자동 변환 지원
+        assert r.autofix.fix_id == "to_cmyk"
 
 
 def test_corpus_both_defect_modes_caught():

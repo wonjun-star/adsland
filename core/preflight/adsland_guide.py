@@ -218,7 +218,7 @@ REMEDIATION: dict[str, Remediation] = {
             "photoshop": "이미지 > 모드 > CMYK 색상. 컬러 프로파일은 'CMYK Japan Color 2001 Coated'.",
             "indesign": "색상은 C·M·Y·K 수치로 지정. 별색(PANTONE)은 색상 유형을 '원색(CMYK)'으로 변환.",
         },
-        autofixable=False,  # RGB→CMYK 자동 변환은 색 왜곡 위험 → 자동 적용하지 않음(안내만)
+        autofixable=True,  # RGB→CMYK 근사 변환(GCR) 자동 적용 가능 (색 약간 달라질 수 있음 고지)
         source="photoshop",
     ),
     "resolution": Remediation(
