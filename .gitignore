@@ -13,3 +13,4 @@ data/samples/
 build/
 anthropic_key.txt
 .env
+.tmp_*/
