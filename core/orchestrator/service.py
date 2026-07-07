@@ -69,6 +69,20 @@ _SLOT_ASK_KEYWORDS: dict[str, str] = {
 _OPTION_ASK_PHRASES = ("있어", "있나", "있을까", "있는", "종류", "뭐", "무슨", "어떤", "옵션", "골라", "선택", "뭔가")
 
 
+#: 고객이 '탐색·질문' 중임을 나타내는 말투 (이런 턴엔 견적·주문확인 카드를 다시 띄우지 않는다)
+_EXPLORE_MARKERS = (
+    "뭐있", "뭐가있", "말고", "각각", "비교", "옵션", "종류", "얼마", "차이", "다른거", "어떤게",
+)
+
+
+def _looks_exploring(text: str | None) -> bool:
+    """고객이 아직 고르는 중(옵션·가격을 묻는 중)인가 — 확정 카드 재노출 여부 판단용."""
+    if not text:
+        return False
+    low = text.replace(" ", "")
+    return any(m in low for m in _EXPLORE_MARKERS)
+
+
 def _asked_options_slot(text: str, schema: ProductSchema | None) -> str | None:
     """'용지 뭐 있어?'처럼 특정 슬롯의 선택지를 묻는 말이면 그 슬롯명을 돌려준다."""
     if not text or schema is None:
@@ -1067,6 +1081,34 @@ class IntakeService:
         except Exception:
             return False
 
+    def flip_back_side(self, session_id: str) -> TurnResult:
+        """양면 파일의 뒷면(2페이지)을 180° 돌린다 — 뒷면 위아래가 뒤집혀 보일 때."""
+        import pikepdf
+
+        row = self._get(session_id)
+        if not row.file_path or self._page_count(row.file_path) != 2:
+            return self._advance(session_id, notices=["flip_needs_double"], kind="turn")
+        src = Path(row.file_path)
+        out = src.parent / f"{src.stem}_flip.pdf"
+        try:
+            pdf = pikepdf.open(src)
+            pg = pdf.pages[1]
+            cur = int(pg.get("/Rotate", 0)) if "/Rotate" in pg else 0
+            pg.Rotate = (cur + 180) % 360
+            pdf.save(out)
+            pdf.close()
+        except Exception:
+            return self._advance(session_id, notices=["flip_failed"], kind="turn")
+        self.store.set_file_path(session_id, str(out))
+        self.store.record_event(session_id, "back_flipped", {})
+        if State(row.state) in (State.SLOT_FILLING, State.PROOF_CONFIRM):
+            self.store.transition(session_id, State.FILE_CHECK, "back_flip_recheck")
+            report = self._run_preflight(session_id)
+            self.store.transition(session_id, State.SLOT_FILLING, "preflight_done")
+        else:
+            report = self._run_preflight(session_id)
+        return self._advance(session_id, notices=["back_flipped"], kind="autofix", report=report)
+
     def handle_cutline(self, session_id: str, src_path: str | Path, original_name: str = "") -> TurnResult:
         """도무송 칼선 파일 접수 → 검증 → 통과 시 칼선 제공됨 기록 후 재검판."""
         from core.preflight.cutline import validate_cutline
@@ -1557,10 +1599,13 @@ class IntakeService:
                     "advisories": advisories,
                 }
             )
-        if d.quote is not None and not d.quote.missing:
+        # 고객이 아직 옵션·가격을 탐색 중인 턴이면 견적·주문확인 카드를 다시 띄우지 않는다.
+        # (고객이 고르기를 끝낸 것 같을 때 다음 턴에 다시 보여준다 — 산만함 방지)
+        exploring = bool(d.asked_slot) or _looks_exploring(d.customer_message)
+        if d.quote is not None and not d.quote.missing and not exploring:
             cards.append({"type": "quote", "estimate": d.estimate, **d.quote.model_dump(mode="json")})
         # 최종 확인 체크리스트 (맥도날드 키오스크식) — 확정 직전에 사양·도안을 한 번 훑고 진행
-        if d.confirm_review:
+        if d.confirm_review and not exploring:
             # 명함이면 도안 예시를 3D로 함께 보여준다 (앞/뒷면)
             front_preview = back_preview = None
             if row.product == "namecard" and row.file_path:

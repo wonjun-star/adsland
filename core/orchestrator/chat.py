@@ -29,6 +29,15 @@ from core.orchestrator.state_machine import State
 
 T = TypeVar("T")
 
+
+def _wants_back_flip(text: str) -> bool:
+    """'뒷면 뒤집어줘/돌려줘', '위아래 바꿔줘' 같은 뒷면 180° 회전 요청인지 (명시 요청만)."""
+    low = (text or "").replace(" ", "")
+    back = "뒷면" in low or "뒤" in low and "면" in low
+    action = any(k in low for k in ("뒤집", "돌려", "돌리", "반대로", "뒤바꿔", "flip"))
+    updown = "위아래" in low and any(k in low for k in ("뒤집", "바꿔", "돌려", "반대"))
+    return (back and action) or updown
+
 #: 규칙 템플릿마저 실패했을 때의 최후 안내 (원문 예외는 절대 노출하지 않는다)
 _LAST_RESORT_REPLY = "안내 문구를 만드는 중 문제가 생겼어요. 잠시 후 다시 말씀해 주시면 이어서 도와드릴게요."
 
@@ -63,6 +72,12 @@ class ChatPipeline:
         """
         adapter = self.adapter_provider()
         view = self.service.view_session(session_id)
+
+        # 뒷면 뒤집기 요청 (양면 파일이 있을 때) — "뒷면 뒤집어줘/돌려줘" 등 명시 요청이면 바로 실행
+        if view.file_path and _wants_back_flip(text):
+            result = self.service.flip_back_side(session_id)
+            result.directives.customer_message = text
+            return result, self._render(result, adapter)
 
         # 상품 미정이면 분류기로 추정. 이미 정해졌어도 고객이 '다른 상품'을 명시하면
         # 교체를 허용한다 (파일 기반 추정이 틀렸을 때 "아니 엽서야"로 바로잡는 경로).
