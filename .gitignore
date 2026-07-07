@@ -14,3 +14,4 @@ build/
 anthropic_key.txt
 .env
 .tmp_*/
+예시파일/
