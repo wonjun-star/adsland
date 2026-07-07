@@ -972,8 +972,12 @@ def render_reply(
                 if rem is not None:
                     fix_guides.append({"항목": rem.title, "규칙": rem.rule, "이유": rem.why,
                                        "자동보정가능": rem.autofixable})
+        # 변경 내역은 '실제로 보정한 그 턴'에만 LLM이 언급하게 — 이후 턴엔 재료에서 빼 재-announce 방지
+        dir_dump = directives.model_dump(mode="json")
+        if not dir_dump.get("announce_change"):
+            dir_dump["changes"] = []
         payload = {
-            "directives": directives.model_dump(mode="json"),
+            "directives": dir_dump,
             "session": view.model_dump(mode="json"),
             "product_display_name": schema.display_name if schema else None,
             "available_options": available,  # 이 목록 밖의 값은 절대 제안하지 마라
@@ -1190,11 +1194,12 @@ def _changes_line(changes: list) -> str:
     labels = []
     for c in changes:
         before, after = c.get("before"), c.get("after")
+        label = c.get("label", "보정")
         if before and after:
-            labels.append(f"{c.get('label')}({before} → {after})")
+            labels.append(f"{label} — {before} → {after}")
         else:
-            labels.append(c.get("label", "보정"))
-    return "적용한 변경: " + ", ".join(labels) + "."
+            labels.append(label)
+    return "이렇게 맞춰뒀어요: " + ", ".join(labels) + "."
 
 
 def _slot_choice_answer(schema: ProductSchema | None, slot: str, intro: str) -> str | None:
@@ -1352,8 +1357,8 @@ def _rule_render(d: "ReplyDirectives", view: "SessionView", schema: ProductSchem
     # 검판 결과 — 한 줄 (상세는 카드)
     if d.report is not None and d.kind in ("upload", "autofix"):
         parts.append(_report_summary_line(d.report, set(d.offer_autofix)))
-    # 변경 이력 — 보정 직후 한 줄
-    if d.changes and d.kind == "autofix":
+    # 변경 이력 — 실제로 보정한 그 턴에 딱 한 줄 (이후 턴엔 반복 안 함)
+    if d.changes and getattr(d, "announce_change", False):
         parts.append(_changes_line(d.changes))
 
     # 예상/확정 견적 — 한 줄. 단, 확정 단계에서 최종 견적을 아직 요청 안 했으면 금액 반복 안 함

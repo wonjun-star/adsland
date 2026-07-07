@@ -179,6 +179,9 @@ class ReplyDirectives(BaseModel):
     # 결과 우선 — 예상 견적 + 변경 이력 (검판원·발주·고객 공용)
     estimate: bool = False                   # quote가 확정이 아니라 예상 견적
     changes: list[dict] = Field(default_factory=list)  # 접수본→최종본 변경 항목
+    # 이번 턴에 실제로 파일을 보정했는가 — 변경 내역(카드·문장)은 이때 딱 한 번만 알린다.
+    # (kind로 판단하지 않는다: 뒷면 뒤집기 같은 다른 autofix 턴에서 과거 색보정 내역이 되살아나는 것 방지)
+    announce_change: bool = False
     detected_product: str = ""               # 파일 규격으로 상품을 알아챘을 때 표시명
     offer_back_side: bool = False            # 앞면만 올린 명함류 → 뒷면(양면) 확인
     customer_question: str = ""              # 고객이 던진 질문 (용지·사이즈·가격 등) → 답해야 함
@@ -720,19 +723,8 @@ class IntakeService:
         else:
             report = self._run_preflight(session_id)
 
-        result = self._advance(session_id, kind="autofix", report=report)
-        previews = fix_result.get("previews") or []
-        if previews:
-            result.cards.insert(
-                0,
-                {
-                    "type": "autofix_preview",
-                    "check_id": check_id,
-                    "before": previews[0]["before"],
-                    "after": previews[0]["after"],
-                },
-            )
-        return result
+        # 변경 내역은 change_summary 카드 하나로만 보여준다 (보정전→보정후 별도 카드는 중복 — 제거).
+        return self._advance(session_id, kind="autofix", report=report, announce_change=True)
 
     def handle_card_content(
         self,
@@ -929,20 +921,12 @@ class IntakeService:
                 },
                 "final_preview": front_preview,        # 최종 확정본 앞면 (발주 인계)
                 "back_preview": back_preview,          # 뒷면 (양면일 때)
-                "changes": changes,                    # 접수본 대비 변경 내역
+                "changes": changes,                    # 접수본 대비 변경 내역 (카드 안에 요약으로 표시)
                 "file_name": Path(row.file_path).name if row.file_path else None,
             }
         ]
-        if changes:
-            cards.append(
-                {
-                    "type": "change_summary",
-                    "product": row.product,
-                    "items": changes,
-                    "original_preview": changes[0].get("before_preview"),
-                    "final_preview": changes[-1].get("after_preview"),
-                }
-            )
+        # 완료 화면엔 별도 change_summary 카드를 붙이지 않는다 — 변경 내역은 order_confirmed
+        # 카드 안에 텍스트 요약으로 이미 들어 있어(중복 노출 방지), 보정 직후 한 번만 크게 보여준다.
         return TurnResult(session=self._view(row), directives=d, cards=cards)
 
     def view_session(self, session_id: str) -> SessionView:
@@ -1330,14 +1314,24 @@ class IntakeService:
             previews = p.get("previews") or [{}]
             pv = previews[0] if previews else {}
             cid = p.get("check_id")
-            label = "재단 여백 자동 연장" if cid == "bleed" else f"자동 보정({cid})"
+            # 항목별로 '무엇을·왜' 사람 말로 (색공간은 눈에 안 띄게 맞추는 보정이라 별도 설명을 붙인다)
+            if cid == "bleed":
+                bl = round(float(p.get("bleed_mm", 3)))
+                label, before, after = "재단 여백 자동 연장", "재단 여백 없음(0mm)", f"사방 {bl}mm 확보"
+                note = ""
+            elif cid == "colorspace":
+                label, before, after = "색상 인쇄용 변환", "RGB (화면용)", "CMYK (인쇄용)"
+                note = "화면 색 그대로 인쇄되게 맞췄어요 — 그래서 앞뒤 미리보기가 거의 같아 보이는 게 정상이에요."
+            else:
+                label, before, after, note = f"자동 보정({cid})", "보정 전", "보정 후", ""
             changes.append(
                 {
                     "kind": "autofix",
                     "check_id": cid,
                     "label": label,
-                    "before": "재단 여백 없음(0mm)" if cid == "bleed" else "보정 전",
-                    "after": f"사방 {round(float(p.get('bleed_mm', 3)))}mm 확보" if cid == "bleed" else "보정 후",
+                    "before": before,
+                    "after": after,
+                    "note": note,
                     "before_preview": pv.get("before"),
                     "after_preview": pv.get("after"),
                 }
@@ -1352,10 +1346,16 @@ class IntakeService:
         kind: str = "turn",
         report: PreflightReport | None = None,
         customer_text: str = "",
+        announce_change: bool = False,
     ) -> TurnResult:
         """턴 마무리 공통 파이프라인: 추론 반영 → 질문 정책 → 견적 → 시그널 → 전이 → 지시서."""
         row = self._get(session_id)
-        d = ReplyDirectives(kind=kind, notices=list(notices or []), customer_message=customer_text)
+        d = ReplyDirectives(
+            kind=kind,
+            notices=list(notices or []),
+            customer_message=customer_text,
+            announce_change=announce_change,
+        )
 
         if report is None:
             report = self._latest_report(session_id)
@@ -1708,8 +1708,8 @@ class IntakeService:
                     "back_preview": back_preview,
                 }
             )
-        # 변경 내역 카드는 보정 직후·최종 확정 때만 (매 턴 반복 노출 방지)
-        if d.changes and (d.kind == "autofix" or d.awaiting_confirm):
+        # 변경 내역 카드는 실제로 보정한 그 턴에 딱 한 번만 (이후 대화·최종 확인 화면엔 반복 노출 안 함)
+        if d.changes and d.announce_change:
             cards.append(
                 {
                     "type": "change_summary",

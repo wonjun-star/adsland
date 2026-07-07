@@ -1450,7 +1450,7 @@ textarea {
   text-align: center;
   font-size: 12.5px;
   color: var(--faint);
-  margin-top: -6px;
+  margin: 8px 0 2px;
 }
 
 .design-templates {
@@ -1691,6 +1691,13 @@ textarea {
 .change-delta .after {
   color: var(--accent-ink);
   font-weight: 800;
+}
+
+.change-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 .change-empty {

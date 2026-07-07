@@ -271,7 +271,7 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
           placeholder={
             completed
               ? '주문이 완료됐어요. 새 상담을 시작하려면 상단의 "새 상담"을 눌러 주세요.'
-              : '주문 내용을 입력하세요. 예) 90×90 스티커 500매, 무광 코팅으로요'
+              : '편하게 물어보세요 — 예) 90×90 스티커 500매 얼마예요?'
           }
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -280,7 +280,7 @@ export default function ChatPane({ messages, busy, session, onSend, onSelect, on
           전송
         </button>
       </div>
-      <p className="composer-hint">PDF 파일을 이 영역에 끌어다 놓으면 바로 검판이 시작돼요.</p>
+      <p className="composer-hint">주문이든 궁금한 점이든 편하게 말씀해 주세요. PDF는 이 영역에 끌어다 놓으면 바로 검판돼요.</p>
 
       {dragging && (
         <div className="drop-overlay" aria-hidden="true">

@@ -280,10 +280,10 @@ function FilePreviewCard({ card }) {
   )
 }
 
+// 항목은 '무엇이→무엇으로' 텍스트로만 (전/후 이미지는 카드 상단 히어로 하나로 충분 — 중복 제거).
 function ChangeItem({ item }) {
   const label = item.label || checkLabel(item.check_id) || '변경 항목'
   const hasDelta = item.before !== undefined || item.after !== undefined
-  const hasImages = Boolean(item.before_url || item.after_url)
   return (
     <li className="change-item">
       <div className="change-item-head">
@@ -296,16 +296,7 @@ function ChangeItem({ item }) {
           </span>
         )}
       </div>
-      {hasImages && (
-        <BeforeAfter
-          before={item.before_url}
-          after={item.after_url}
-          beforeAlt={`${label} 변경 전`}
-          afterAlt={`${label} 변경 후`}
-          beforeLabel="변경 전"
-          afterLabel="변경 후"
-        />
-      )}
+      {item.note && <p className="change-note">{item.note}</p>}
     </li>
   )
 }
@@ -374,7 +365,6 @@ function ConfirmReviewCard({ card, latest, busy, onReopen, onConfirm }) {
     <div className="card confirm-review">
       <div className="card-title">
         주문 확인
-        <span className="card-title-sub">확정 전에 한 번만 봐주세요</span>
       </div>
       {show3D && (
         <div className="review-3d">
