@@ -48,6 +48,16 @@ def _first_blend_mode(bm_obj: Any) -> str | None:
         return None
 
 
+def _as_bool(v: Any) -> bool:
+    """PDF Boolean 값 → 파이썬 bool (없으면 False). 오버프린트 /OP·/op 판정용."""
+    if v is None:
+        return False
+    try:
+        return bool(v)
+    except Exception:
+        return str(v).lower() == "true"
+
+
 def _smask_active(sm_obj: Any) -> bool:
     """ExtGState /SMask 값이 실제 소프트 마스크인지. /None 이름은 '마스크 없음'."""
     if sm_obj is None:
@@ -89,6 +99,12 @@ def _scan_extgstate(egs: Any, page_i: int, found: list[dict], seen: set) -> None
 
             if "/SMask" in gd and _smask_active(gd.get("/SMask")):
                 entry["smask"] = True
+                transparent = True
+
+            # 오버프린트(/OP 선, /op 칠) 설정 — 켜져 있으면 밑색 위 인쇄가 겹쳐 색이 달라질 수 있다.
+            # (특히 K100은 자동 오버프린트되어 흰 글씨/로고가 사라질 수 있음 — 가이드 경고)
+            if _as_bool(gd.get("/OP")) or _as_bool(gd.get("/op")):
+                entry["overprint"] = True
                 transparent = True
 
             if not transparent:
@@ -164,15 +180,21 @@ def check_transparency(ctx: CheckContext):
             _scan_resources(page.get("/Resources", None), i, found, seen, visited, 0)
 
         pages = sorted({e["page"] for e in found})
-        measured = {"transparent_states": found, "count": len(found)}
+        has_overprint = any(e.get("overprint") for e in found)
+        measured = {"transparent_states": found, "count": len(found), "overprint": has_overprint}
         if found:
+            kinds = []
+            if any(not e.get("overprint") for e in found):
+                kinds.append("투명도")
+            if has_overprint:
+                kinds.append("오버프린트")
             return result(
                 "transparency",
                 CheckStatus.WARN,
                 measured=measured,
                 required=required,
                 pages=pages,
-                detail=f"transparent states found: {len(found)} on pages {pages}",
+                detail=f"{'·'.join(kinds)} 설정 발견 ({len(found)}건, 페이지 {pages}) — 플래튼/해제 확인 필요",
             )
         return result(
             "transparency",
