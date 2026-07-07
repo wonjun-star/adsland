@@ -304,9 +304,34 @@ class IntakeService:
         return TurnResult(session=self._view(row), directives=d, cards=self._cards(d, row))
 
     def handle_upload(self, session_id: str, src_path: str | Path, original_name: str = "") -> TurnResult:
-        """PDF 업로드 → 보관 → (가능하면) FILE_CHECK 전이 → 프리플라이트 → 정책 재평가."""
+        """PDF/이미지 업로드 → 보관 → (가능하면) FILE_CHECK 전이 → 프리플라이트 → 정책 재평가.
+
+        JPG/PNG는 주문 규격 크기의 PDF로 감싸 검수한다 (해상도·크기 검수 유효, 벡터 검수는 해당 없음).
+        """
         self.store.increment_turn(session_id)
         row = self._get(session_id)
+
+        # 이미지(JPG/PNG)면 PDF로 감싼다 — 주문 규격을 알면 그 크기로(해상도 검사가 실제 dpi를 잼)
+        src_path = Path(src_path)
+        image_wrapped = False
+        try:
+            head = src_path.read_bytes()[:16]
+        except Exception:
+            head = b""
+        from core.intake.image_to_pdf import is_image_bytes
+
+        if is_image_bytes(head):
+            from core.intake.image_to_pdf import image_to_pdf
+
+            order_size = self._order_context(row).size_mm
+            pdf_path = src_path.with_name(src_path.stem + "_img.pdf")
+            try:
+                image_to_pdf(src_path, pdf_path, size_mm=order_size)
+                src_path = pdf_path
+                image_wrapped = True
+            except Exception:
+                pass  # 변환 실패 시 원본 그대로 진행 (아래 프리플라이트가 판단 불가로 격리)
+
         prev_file = row.file_path  # 뒷면 병합 판단용 (앞면)
 
         dest_dir = UPLOAD_DIR / session_id
@@ -389,6 +414,8 @@ class IntakeService:
             notices.insert(0, "back_side_merged")
         if size_from_file:
             notices.insert(0, size_from_file)  # 이미 완성된 코드 (size_from_file:.. 또는 size_snapped:..)
+        if image_wrapped:
+            notices.insert(0, "image_intake")  # 이미지 접수 — 벡터 검수는 해당 없음 (안내)
         result = self._advance(session_id, notices=notices, kind="upload", report=report)
         if detected:
             result.directives.detected_product = self.catalog[detected].display_name
@@ -1441,6 +1468,13 @@ class IntakeService:
                 results.append(rd)
             # 통과했지만 가이드상 권장 사항(막지는 않음) — '참고' 안내로 별도 표시
             advisories: list[dict] = []
+            if "image_intake" in d.notices:
+                advisories.append({
+                    "key": "image_intake",
+                    "text": "이미지(JPG/PNG) 파일이라 해상도·크기만 검수했어요. 선 굵기·별색 칼선·"
+                            "글꼴 같은 벡터 검수는 이미지엔 해당되지 않아요. 정밀 인쇄는 PDF를 권장해요.",
+                    "guide_url": guide_url("pdf"),
+                })
             fe = d.report.by_id("font_embed")
             if fe is not None and str(fe.status) == "pass" and (fe.measured or {}).get("not_outlined"):
                 advisories.append({

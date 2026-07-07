@@ -112,10 +112,14 @@ export default function App() {
     async (fileList) => {
       if (!session || busy || !fileList) return
       const files = Array.from(fileList).filter(
-        (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name || ''),
+        (f) =>
+          f.type === 'application/pdf' ||
+          f.type === 'image/png' ||
+          f.type === 'image/jpeg' ||
+          /\.(pdf|png|jpe?g)$/i.test(f.name || ''),
       )
       if (files.length === 0) {
-        push({ role: 'system', text: 'PDF 파일만 접수할 수 있어요. 인쇄용 PDF로 저장한 뒤 다시 올려 주세요.' })
+        push({ role: 'system', text: 'PDF 또는 이미지(JPG·PNG)만 접수할 수 있어요.' })
         return
       }
       const names = files.map((f) => f.name || 'upload.pdf')

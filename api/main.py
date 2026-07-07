@@ -319,8 +319,10 @@ def create_app() -> FastAPI:
         content = await file.read()
         if len(content) > MAX_UPLOAD_BYTES:
             raise HTTPException(status_code=413, detail="파일이 너무 큽니다 (최대 30MB).")
-        if not content.startswith(PDF_MAGIC):
-            raise HTTPException(status_code=400, detail="PDF 파일만 업로드할 수 있습니다.")
+        from core.intake.image_to_pdf import is_image_bytes
+
+        if not (content.startswith(PDF_MAGIC) or is_image_bytes(content)):
+            raise HTTPException(status_code=400, detail="PDF 또는 이미지(JPG·PNG) 파일만 올릴 수 있습니다.")
 
         dest_dir = UPLOAD_DIR / session_id
         dest_dir.mkdir(parents=True, exist_ok=True)
